@@ -2,13 +2,14 @@
 Entry point for the STLC Pipeline Agent — Advanced Capstone (Phases 0–5).
 
 Usage:
-  python main.py                         # runs default User Authentication story
-  python main.py --feature "X" --story "Y"
-  python main.py --phases 01             # run only Phase 0+1 (Intermediate eval)
-  python main.py --phases 0123           # run through Phase 3 (no automation)
+  python main.py                              # default User Authentication story
+  python main.py --ticket KAN-14             # fetch story from Jira via MCP
+  python main.py --feature "X" --story "Y"  # pass story text directly
 
-CAPSTONE: Agent vs Sub-Agents — this file only creates the Orchestrator.
-  The orchestrator decides which sub-agents run and in what order.
+CAPSTONE: MCP Knowledge
+  --ticket mode connects to Jira via the MCP integration in .vscode/mcp.json.
+  The JiraClient fetches the live story so you never need to copy-paste text.
+  This is what MCP enables: agents consuming live external data by ID, not text.
 """
 import argparse
 import os
@@ -34,16 +35,36 @@ Acceptance Criteria:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="STLC Pipeline Agent — Advanced Capstone")
-    parser.add_argument("--feature", default=DEFAULT_FEATURE, help="Feature name")
-    parser.add_argument("--story",   default=DEFAULT_STORY,   help="User story text")
+    parser.add_argument("--ticket",  default=None,           help="Jira ticket ID (e.g. KAN-14) — fetches story via MCP")
+    parser.add_argument("--feature", default=DEFAULT_FEATURE, help="Feature name (used when --ticket not provided)")
+    parser.add_argument("--story",   default=DEFAULT_STORY,   help="User story text (used when --ticket not provided)")
     args = parser.parse_args()
 
     if not os.getenv("ANTHROPIC_API_KEY"):
         print("[Error] ANTHROPIC_API_KEY not set. Add it to .env")
         sys.exit(1)
 
+    # ── CAPSTONE: MCP — fetch story from Jira by ticket ID ───────────────────
+    if args.ticket:
+        try:
+            from tools.jira_client import JiraClient
+            print(f"\n[MCP] Fetching {args.ticket} from Jira...")
+            jira    = JiraClient()
+            story   = jira.fetch_story(args.ticket)
+            feature = story["feature_name"]
+            text    = story["user_story"]
+            print(f"[MCP] Story loaded: {feature}\n")
+        except (EnvironmentError, ValueError) as e:
+            print(f"[Error] Jira fetch failed: {e}")
+            print("Add JIRA_INSTANCE_URL, JIRA_USER_EMAIL, JIRA_API_TOKEN to .env")
+            sys.exit(1)
+    else:
+        feature = args.feature
+        text    = args.story
+    # ─────────────────────────────────────────────────────────────────────────
+
     orchestrator = Orchestrator()
-    state = orchestrator.run(feature_name=args.feature, user_story=args.story)
+    state = orchestrator.run(feature_name=feature, user_story=text)
 
     if state is None:
         print("\n[Error] Pipeline failed at Phase 0+1.")

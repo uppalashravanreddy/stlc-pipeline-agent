@@ -57,19 +57,103 @@ def handle_phase_01_tool(name: str, tool_input: dict) -> tuple[dict, Any]:
     The orchestrator uses captured_output to update PipelineState.
     """
     if name == "save_test_plan":
-        result = _save_test_plan(tool_input)
-        return result, tool_input   # captured = the full structured input
+        normalized_input = _normalize_tool_input(tool_input)
+        if normalized_input is None:
+            return {
+                "error": "phase_1_test_plan must be an object or valid JSON object string"
+            }, None
+        result = _save_test_plan(normalized_input)
+        return result, normalized_input   # captured = the full structured input
     return {"error": f"Unknown tool: {name}"}, None
+
+
+def _normalize_tool_input(tool_input: dict) -> dict | None:
+    phase_1_test_plan = tool_input.get("phase_1_test_plan")
+    if isinstance(phase_1_test_plan, str):
+        try:
+            phase_1_test_plan = json.loads(phase_1_test_plan)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(phase_1_test_plan, dict):
+            return None
+        normalized_input = dict(tool_input)
+        normalized_input["phase_1_test_plan"] = phase_1_test_plan
+        return normalized_input
+    if isinstance(phase_1_test_plan, dict):
+        return tool_input
+    return None
 
 
 def _save_test_plan(data: dict) -> dict:
     OUTPUT_DIR.mkdir(exist_ok=True)
     slug = _slugify(data["feature_name"])
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Save JSON
     json_path = OUTPUT_DIR / f"{slug}_phase01_{ts}.json"
     json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    # Save Markdown — readable artifact for demo and mentor review
+    md_path = OUTPUT_DIR / f"{slug}_phase01_{ts}.md"
+    md_path.write_text(_build_markdown(data), encoding="utf-8")
+
+    print(f"  [tool] saved → {md_path.name}")
     print(f"  [tool] saved → {json_path.name}")
-    return {"status": "success", "file": str(json_path)}
+    return {"status": "success", "markdown": str(md_path), "json": str(json_path)}
+
+
+def _build_markdown(data: dict) -> str:
+    c = data["phase_0_classification"]
+    p = data["phase_1_test_plan"]
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    lines = [
+        f"# Test Plan: {data['feature_name']}",
+        f"_Generated: {ts}_",
+        "",
+        "---",
+        "",
+        "## Phase 0 — Classification",
+        "",
+        "| Field | Value |",
+        "|---|---|",
+        f"| Test Type | `{c['test_type']}` |",
+        f"| Risk Level | `{c['risk_level']}` |",
+        f"| Test Approach | `{c['test_approach']}` |",
+        f"| Priority | `{c['priority']}` |",
+        "",
+        f"**Rationale:** {c['rationale']}",
+        "",
+        "---",
+        "",
+        "## Phase 1 — Test Plan",
+        "",
+        "### Objectives",
+    ]
+    for obj in p.get("objectives", []):
+        lines.append(f"- {obj}")
+
+    lines += ["", "### Scope", "", "**In Scope:**"]
+    for item in p.get("in_scope", []):
+        lines.append(f"- {item}")
+
+    lines += ["", "**Out of Scope:**"]
+    for item in p.get("out_of_scope", []):
+        lines.append(f"- {item}")
+
+    lines += ["", "### Test Scenarios", ""]
+    for i, scenario in enumerate(p.get("test_scenarios", []), start=1):
+        lines.append(f"{i}. {scenario}")
+
+    lines += ["", "### Entry Criteria"]
+    for item in p.get("entry_criteria", []):
+        lines.append(f"- {item}")
+
+    lines += ["", "### Exit Criteria"]
+    for item in p.get("exit_criteria", []):
+        lines.append(f"- {item}")
+
+    return "\n".join(lines)
 
 
 def _slugify(text: str) -> str:

@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "jira": {
+      "type": "stdio",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/start-jira-mcp.ps1"
+      ],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}

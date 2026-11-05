@@ -40,14 +40,14 @@ AGENT_CONFIGS: dict[str, AgentConfig] = {
     "generation": AgentConfig(
         name="generation",
         model="claude-sonnet-4-6",           # Phase 2+3 generate and review test cases
-        max_tokens=4000,
+        max_tokens=8000,
         max_iterations=8,
         description="Phase 2: Generate test cases. Phase 3: Review for gaps.",
     ),
     "automation": AgentConfig(
         name="automation",
         model="claude-sonnet-4-6",           # Phase 4+5 generate and review pytest code
-        max_tokens=4000,
+        max_tokens=8000,
         max_iterations=8,
         description="Phase 4: Generate pytest automation. Phase 5: Review code quality.",
     ),
