@@ -32,7 +32,7 @@ def find_existing_checkpoint(feature_name: str) -> dict:
         return {}
 
     found = {}
-    for phase_tag, phase_num in [("phase01", 1), ("phase02", 2), ("phase03", 3), ("phase04", 4), ("phase05", 5)]:
+    for phase_tag, phase_num in [("test_plan", 1), ("test_cases", 2), ("test_case_review", 3), ("automation", 4), ("automation_review", 5)]:
         matches = sorted(
             story_dir.glob(f"{phase_tag}*.json"),
             key=lambda p: p.stat().st_mtime,
@@ -111,8 +111,8 @@ def describe_checkpoint(checkpoint: dict) -> str:
     if not checkpoint:
         return "No existing work found."
     lines = ["Existing work found:"]
-    phase_names = {1: "Phase 1 (Test Plan)", 2: "Phase 2 (Test Cases)",
-                   3: "Phase 3 (Review)", 4: "Phase 4 (Automation)", 5: "Phase 5 (Auto Review)"}
+    phase_names = {1: "Test Plan", 2: "Test Cases",
+                   3: "Test Case Review", 4: "Automation", 5: "Automation Review"}
     for p, path in sorted(checkpoint.items()):
         lines.append(f"  ✓ {phase_names.get(p, f'Phase {p}')} — {path.name}")
     return "\n".join(lines)

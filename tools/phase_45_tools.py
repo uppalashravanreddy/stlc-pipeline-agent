@@ -110,10 +110,10 @@ def handle_phase_45_tool(name: str, tool_input: dict) -> tuple[dict, Any]:
 def _save_automation_code(data: dict) -> dict:
     story_dir = get_story_dir(data.get("feature_name", "unknown"))
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_path = story_dir / f"phase04_{ts}.json"
+    json_path = story_dir / f"automation_{ts}.json"
     json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    py_path = story_dir / data.get("test_file_name", f"phase04_{ts}.py")
+    py_path = story_dir / data.get("test_file_name", f"automation_{ts}.py")
     lines = []
     for imp in data.get("imports", []):
         lines.append(imp)
@@ -135,15 +135,15 @@ def _save_automation_code(data: dict) -> dict:
         lines.append("")
 
     py_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"  [tool] saved → {story_dir.name}/{json_path.name}")
     print(f"  [tool] saved → {story_dir.name}/{py_path.name}")
+    print(f"  [tool] saved → {story_dir.name}/{json_path.name}")
     return {"status": "success", "json_file": str(json_path), "py_file": str(py_path)}
 
 
 def _save_phase05(data: dict) -> dict:
     story_dir = get_story_dir(data.get("feature_name", "unknown"))
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = story_dir / f"phase05_{ts}.json"
+    path = story_dir / f"automation_review_{ts}.json"
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     print(f"  [tool] saved → {story_dir.name}/{path.name}")
     return {"status": "success", "file": str(path)}
