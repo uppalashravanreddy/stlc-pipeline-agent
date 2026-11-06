@@ -109,10 +109,10 @@ def _save_test_cases(data: dict) -> dict:
     story_dir = get_story_dir(data.get("feature_name", "unknown"))
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    json_path = story_dir / f"test_cases_{ts}.json"
+    json_path = story_dir / f"02_test_cases_{ts}.json"
     json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    md_path = story_dir / f"test_cases_{ts}.md"
+    md_path = story_dir / f"02_test_cases_{ts}.md"
     md_path.write_text(_build_test_cases_md(data), encoding="utf-8")
 
     print(f"  [tool] saved → {story_dir.name}/{md_path.name}")
@@ -124,10 +124,10 @@ def _save_review(data: dict) -> dict:
     story_dir = get_story_dir(data.get("feature_name", "unknown"))
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    json_path = story_dir / f"test_case_review_{ts}.json"
+    json_path = story_dir / f"03_test_case_review_{ts}.json"
     json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    md_path = story_dir / f"test_case_review_{ts}.md"
+    md_path = story_dir / f"03_test_case_review_{ts}.md"
     md_path.write_text(_build_review_md(data), encoding="utf-8")
 
     print(f"  [tool] saved → {story_dir.name}/{md_path.name}")

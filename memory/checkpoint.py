@@ -32,7 +32,7 @@ def find_existing_checkpoint(feature_name: str) -> dict:
         return {}
 
     found = {}
-    for phase_tag, phase_num in [("test_plan", 1), ("test_cases", 2), ("test_case_review", 3), ("automation", 4), ("automation_review", 5)]:
+    for phase_tag, phase_num in [("01_test_plan", 1), ("02_test_cases", 2), ("03_test_case_review", 3), ("04_automation", 4), ("05_automation_review", 5)]:
         matches = sorted(
             story_dir.glob(f"{phase_tag}*.json"),
             key=lambda p: p.stat().st_mtime,

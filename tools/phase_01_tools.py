@@ -87,10 +87,10 @@ def _save_test_plan(data: dict) -> dict:
     story_dir = get_story_dir(data["feature_name"])
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    json_path = story_dir / f"test_plan_{ts}.json"
+    json_path = story_dir / f"01_test_plan_{ts}.json"
     json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    md_path = story_dir / f"test_plan_{ts}.md"
+    md_path = story_dir / f"01_test_plan_{ts}.md"
     md_path.write_text(_build_markdown(data), encoding="utf-8")
 
     print(f"  [tool] saved → {story_dir.name}/{md_path.name}")
