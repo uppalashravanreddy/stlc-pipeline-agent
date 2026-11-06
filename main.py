@@ -63,8 +63,24 @@ def main() -> None:
         text    = args.story
     # ─────────────────────────────────────────────────────────────────────────
 
+    # CAPSTONE: External Memory — check for existing work before re-running
+    from memory.checkpoint import find_existing_checkpoint, load_checkpoint, describe_checkpoint
+    checkpoint = find_existing_checkpoint(feature)
+
+    resume_from = 0
+    state = None
+
+    if checkpoint:
+        print(f"\n{describe_checkpoint(checkpoint)}")
+        print("\n  Resume from last checkpoint? (y = yes / n = start fresh)")
+        answer = input("  > ").strip().lower()
+        if answer in ("y", "yes"):
+            state, resume_from = load_checkpoint(feature, text)
+            print(f"\n  Resuming from Phase {resume_from}...\n")
+
     orchestrator = Orchestrator()
-    state = orchestrator.run(feature_name=feature, user_story=text)
+    state = orchestrator.run(feature_name=feature, user_story=text,
+                              resume_state=state, resume_from=resume_from)
 
     if state is None:
         print("\n[Error] Pipeline failed at Phase 0+1.")

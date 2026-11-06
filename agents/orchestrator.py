@@ -39,7 +39,9 @@ class Orchestrator:
         self.generation_agent = GenerationAgent()
         self.automation_agent = AutomationAgent()
 
-    def run(self, feature_name: str, user_story: str) -> PipelineState | None:
+    def run(self, feature_name: str, user_story: str,
+            resume_state: PipelineState | None = None,
+            resume_from: int = 0) -> PipelineState | None:
         """
         CAPSTONE: Workflow / Pipelines
 
@@ -89,52 +91,61 @@ class Orchestrator:
         self.automation_agent.log_path = log_path
         print(f"  Log     : logs/{log_path.name}\n")
 
-        # CAPSTONE: Memory Types — PipelineState is the shared working memory
-        state = PipelineState(feature_name=feature_name, user_story=user_story)
+        # CAPSTONE: Memory Types — use checkpoint state if resuming, else create fresh
+        state = resume_state or PipelineState(feature_name=feature_name, user_story=user_story)
 
         # ── Phase 0 + 1 ─────────────────────────────────────────────────────
-        state = self.analysis_agent.run(state)
-        if not state.phase_1_test_plan:
-            _abort("Phase 0+1", "AnalysisAgent did not call save_test_plan. Check the log for FAIL events.")
-            return None
+        if resume_from < 2:
+            state = self.analysis_agent.run(state)
+            if not state.phase_1_test_plan:
+                _abort("Phase 0+1", "AnalysisAgent did not call save_test_plan. Check the log for FAIL events.")
+                return None
+        else:
+            print("  [resume] Skipping Phase 0+1 — loaded from checkpoint\n")
 
         # ── HITL Gate 1 ──────────────────────────────────────────────────────
-        _banner("HITL GATE 1 — Review Test Plan")
-        _print_phase_01_summary(state)
-
-        if not _hitl_prompt("Approve test plan and generate test cases?"):
-            print("\n[Orchestrator] Pipeline aborted at Gate 1.")
-            state.hitl_approvals["gate_1"] = "rejected"
-            return state
-        state.hitl_approvals["gate_1"] = "approved"
+        if resume_from < 2:
+            _banner("HITL GATE 1 — Review Test Plan")
+            _print_phase_01_summary(state)
+            if not _hitl_prompt("Approve test plan and generate test cases?"):
+                state.hitl_approvals["gate_1"] = "rejected"
+                return state
+            state.hitl_approvals["gate_1"] = "approved"
 
         # ── Phase 2 (Test Cases) ─────────────────────────────────────────────
-        state = self.generation_agent.run_phase_2(state)
-        if not state.phase_2_test_cases:
-            _abort("Phase 2", "GenerationAgent did not call save_test_cases. Partial output saved to output/. Re-run with --ticket or check the log.")
-            return state
+        if resume_from < 4:
+            state = self.generation_agent.run_phase_2(state)
+            if not state.phase_2_test_cases:
+                _abort("Phase 2", "GenerationAgent did not call save_test_cases. Partial output saved to output/. Re-run with --ticket or check the log.")
+                return state
+        else:
+            print("  [resume] Skipping Phase 2 — loaded from checkpoint\n")
 
         # ── Phase 3 (Review) ─────────────────────────────────────────────────
-        state = self.generation_agent.run_phase_3(state)
+        if resume_from < 4:
+            state = self.generation_agent.run_phase_3(state)
 
         # ── HITL Gate 2 ──────────────────────────────────────────────────────
-        _banner("HITL GATE 2 — Review Test Case Coverage")
-        _print_phase_23_summary(state)
-
-        if not _hitl_prompt("Approve test cases and generate automation?"):
-            print("\n[Orchestrator] Pipeline aborted at Gate 2.")
-            state.hitl_approvals["gate_2"] = "rejected"
-            return state
-        state.hitl_approvals["gate_2"] = "approved"
+        if resume_from < 4:
+            _banner("HITL GATE 2 — Review Test Case Coverage")
+            _print_phase_23_summary(state)
+            if not _hitl_prompt("Approve test cases and generate automation?"):
+                state.hitl_approvals["gate_2"] = "rejected"
+                return state
+            state.hitl_approvals["gate_2"] = "approved"
 
         # ── Phase 4 (Automation Generate) ────────────────────────────────────
-        state = self.automation_agent.run_phase_4(state)
-        if not state.phase_4_automation:
-            _abort("Phase 4", "AutomationAgent did not call save_automation. Check log for HARD_STOP or FAIL events.")
-            return state
+        if resume_from < 6:
+            state = self.automation_agent.run_phase_4(state)
+            if not state.phase_4_automation:
+                _abort("Phase 4", "AutomationAgent did not call save_automation. Check log for HARD_STOP or FAIL events.")
+                return state
+        else:
+            print("  [resume] Skipping Phase 4 — loaded from checkpoint\n")
 
         # ── Phase 5 (Automation Review) ──────────────────────────────────────
-        state = self.automation_agent.run_phase_5(state)
+        if resume_from < 6:
+            state = self.automation_agent.run_phase_5(state)
 
         # ── HITL Gate 3 ──────────────────────────────────────────────────────
         _banner("HITL GATE 3 — Final Sign-off")

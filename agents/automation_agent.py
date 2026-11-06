@@ -37,8 +37,10 @@ When all test functions are generated, call save_automation and stop.
 - test_type=Security: check response headers, status codes, error messages
 - automation_feasibility=Low: generate the function with a pytest.skip() and a comment explaining why
 
-## RULE
-Generate ALL test functions before calling save_automation.
+## HARD LIMIT — MAX 5 FUNCTIONS
+Generate only the top 5 test functions by automation_feasibility (High first).
+For Low feasibility cases, generate one pytest.skip() stub with a comment.
+Do NOT plan first. Generate functions directly then call save_automation immediately.
 """
 
 PHASE_5_SYSTEM_PROMPT = """\

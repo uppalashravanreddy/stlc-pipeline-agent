@@ -110,14 +110,38 @@ class BaseAgent:
             if response.stop_reason == "max_tokens":
                 self._log("max_tokens_hit", "nudging agent to call tool now")
                 messages.append({"role": "assistant", "content": response.content})
-                messages.append({
-                    "role": "user",
-                    "content": (
-                        "You were cut off at the token limit. "
-                        "Call the save tool NOW with whatever you have generated so far. "
-                        "Do not re-plan or regenerate — just call the tool immediately."
-                    ),
-                })
+
+                # CRITICAL: if the truncated response has a tool_use block,
+                # the API requires a tool_result before any new user message.
+                # Missing this causes 400 "tool_use without tool_result".
+                pending_tool_uses = [
+                    b for b in response.content
+                    if hasattr(b, "type") and b.type == "tool_use"
+                ]
+                if pending_tool_uses:
+                    messages.append({
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": b.id,
+                                "content": json.dumps({
+                                    "status": "interrupted",
+                                    "message": "Response was cut off. Call the save tool with data generated so far.",
+                                }),
+                            }
+                            for b in pending_tool_uses
+                        ],
+                    })
+                else:
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "You were cut off at the token limit. "
+                            "Call the save tool NOW with whatever you have generated so far. "
+                            "Do not re-plan or regenerate — just call the tool immediately."
+                        ),
+                    })
                 continue
 
             if response.stop_reason == "tool_use":
