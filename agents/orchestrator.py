@@ -173,7 +173,9 @@ class Orchestrator:
         _print_final_summary(state)
         summary_path = save_pipeline_summary(state)   # ONE .md file, all phases
 
-        # Write pipeline end to log
+        # Write pipeline end to log — includes token summary for analytics
+        total_in  = sum(e.get("tokens_in",  0) for e in _read_log(log_path) if "tokens_in"  in e)
+        total_out = sum(e.get("tokens_out", 0) for e in _read_log(log_path) if "tokens_out" in e)
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps({
                 "ts":             datetime.now().isoformat(),
@@ -182,6 +184,11 @@ class Orchestrator:
                 "test_cases":     len(state.phase_2_test_cases or []),
                 "hitl_approvals": state.hitl_approvals,
                 "summary_file":   str(summary_path),
+                "token_summary": {
+                    "total_in":    total_in,
+                    "total_out":   total_out,
+                    "cost_usd":    round((total_in * 3 + total_out * 15) / 1_000_000, 6),
+                },
             }) + "\n")
         print(f"  Trace   → logs/{log_path.name}")
 
@@ -217,6 +224,13 @@ def _hitl_prompt(message: str) -> bool:
 
 
 # ── Print helpers ─────────────────────────────────────────────────────────────
+
+def _read_log(log_path) -> list:
+    try:
+        return [json.loads(line) for line in log_path.read_text().splitlines() if line.strip()]
+    except Exception:
+        return []
+
 
 def _abort(phase: str, reason: str) -> None:
     print(f"\n{'!'*60}")
