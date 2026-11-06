@@ -98,12 +98,151 @@ PHASE_23_TOOLS: list[dict] = [
 def handle_phase_23_tool(name: str, tool_input: dict) -> tuple[dict, Any]:
     """Returns (tool_result_for_api, captured_output)."""
     if name == "save_test_cases":
-        result = _save_json(tool_input, "phase02")
+        result = _save_test_cases(tool_input)
         return result, ("phase_2", tool_input.get("test_cases", []))
     if name == "save_review":
-        result = _save_json(tool_input, "phase03")
+        result = _save_review(tool_input)
         return result, ("phase_3", tool_input)
     return {"error": f"Unknown tool: {name}"}, None
+
+
+def _save_test_cases(data: dict) -> dict:
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    slug = _slugify(data.get("feature_name", "unknown"))
+    ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # JSON
+    json_path = OUTPUT_DIR / f"{slug}_phase02_{ts}.json"
+    json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    # Markdown — readable test case document
+    md_path = OUTPUT_DIR / f"{slug}_phase02_{ts}.md"
+    md_path.write_text(_build_test_cases_md(data), encoding="utf-8")
+
+    print(f"  [tool] saved → {md_path.name}")
+    print(f"  [tool] saved → {json_path.name}")
+    return {"status": "success", "markdown": str(md_path), "json": str(json_path)}
+
+
+def _save_review(data: dict) -> dict:
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    slug = _slugify(data.get("feature_name", "unknown"))
+    ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # JSON
+    json_path = OUTPUT_DIR / f"{slug}_phase03_{ts}.json"
+    json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    # Markdown
+    md_path = OUTPUT_DIR / f"{slug}_phase03_{ts}.md"
+    md_path.write_text(_build_review_md(data), encoding="utf-8")
+
+    print(f"  [tool] saved → {md_path.name}")
+    print(f"  [tool] saved → {json_path.name}")
+    return {"status": "success", "markdown": str(md_path), "json": str(json_path)}
+
+
+def _build_test_cases_md(data: dict) -> str:
+    ts  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    tcs = data.get("test_cases", [])
+    lines = [
+        f"# Test Cases: {data.get('feature_name', '')}",
+        f"_Generated: {ts} | {len(tcs)} test cases_",
+        "",
+        "---",
+        "",
+        "## Summary",
+        "",
+        "| ID | Title | Type | Priority | Automation |",
+        "|---|---|---|---|---|",
+    ]
+    for tc in tcs:
+        lines.append(
+            f"| `{tc.get('id','')}` | {tc.get('title','')[:60]} | "
+            f"{tc.get('test_type','')} | {tc.get('priority','')} | "
+            f"{tc.get('automation_feasibility','')} |"
+        )
+
+    lines += ["", "---", ""]
+    for tc in tcs:
+        lines += [
+            f"## {tc.get('id','')} — {tc.get('title','')}",
+            "",
+            f"**Scenario:** {tc.get('scenario_ref','')}  ",
+            f"**Type:** {tc.get('test_type','')}  |  "
+            f"**Priority:** {tc.get('priority','')}  |  "
+            f"**Automation:** {tc.get('automation_feasibility','')}",
+            "",
+            "**Preconditions:**",
+        ]
+        for p in tc.get("preconditions", []):
+            lines.append(f"- {p}")
+
+        lines += ["", "**Steps:**"]
+        for i, s in enumerate(tc.get("steps", []), 1):
+            lines.append(f"{i}. {s}")
+
+        lines += ["", f"**Expected Result:** {tc.get('expected_result','')}"]
+
+        td = tc.get("test_data", {})
+        if td:
+            lines += ["", "**Test Data:**", "```json", json.dumps(td, indent=2), "```"]
+
+        lines += ["", "---", ""]
+
+    return "\n".join(lines)
+
+
+def _build_review_md(data: dict) -> str:
+    ts       = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    approved = data.get("approved", False)
+    score    = data.get("coverage_score", "?")
+    status   = "✅ APPROVED" if approved else "❌ NOT APPROVED"
+
+    lines = [
+        f"# Test Case Review: {data.get('feature_name', '')}",
+        f"_Generated: {ts}_",
+        "",
+        "---",
+        "",
+        f"## Verdict: {status}",
+        "",
+        f"| Coverage Score | Approved |",
+        f"|---|---|",
+        f"| **{score}** | {'Yes ✅' if approved else 'No ❌'} |",
+        "",
+        f"**Overall Notes:** {data.get('overall_notes', '')}",
+        "",
+        "---",
+    ]
+
+    covered = data.get("scenarios_covered", [])
+    if covered:
+        lines += ["", "## Scenarios Covered"]
+        for s in covered:
+            lines.append(f"- ✓ {s}")
+
+    gaps = data.get("gaps", [])
+    if gaps:
+        lines += ["", "## Coverage Gaps"]
+        for g in gaps:
+            lines.append(f"- ⚠️ {g}")
+
+    issues = data.get("issues", [])
+    if issues:
+        lines += ["", "## Issues Found", "", "| Test Case | Severity | Issue |", "|---|---|---|"]
+        for iss in issues:
+            lines.append(
+                f"| {iss.get('test_case_id','')} | {iss.get('severity','')} | {iss.get('issue','')} |"
+            )
+
+    additions = data.get("additions_recommended", [])
+    if additions:
+        lines += ["", "## Recommended Additions"]
+        for a in additions:
+            lines.append(f"- {a}")
+
+    return "\n".join(lines)
 
 
 def _save_json(data: dict, phase_tag: str) -> dict:
