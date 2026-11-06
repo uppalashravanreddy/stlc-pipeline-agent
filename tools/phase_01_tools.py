@@ -51,18 +51,17 @@ PHASE_01_TOOLS: list[dict] = [
 
 def handle_phase_01_tool(name: str, tool_input: dict) -> tuple[dict, Any]:
     """
-    Returns (tool_result_for_api, captured_output_or_None).
-    BaseAgent passes tool_result_for_api back to the model.
-    The orchestrator uses captured_output to update PipelineState.
+    Captures Phase 0+1 data WITHOUT writing any files.
+    Files are written only by the orchestrator:
+      - One summary MD on successful pipeline completion
+      - One debug JSON if the pipeline aborts or hits a hardstop
     """
     if name == "save_test_plan":
         normalized_input = _normalize_tool_input(tool_input)
         if normalized_input is None:
-            return {
-                "error": "phase_1_test_plan must be an object or valid JSON object string"
-            }, None
-        result = _save_test_plan(normalized_input)
-        return result, normalized_input   # captured = the full structured input
+            return {"error": "phase_1_test_plan must be an object or valid JSON"}, None
+        # Return success to the agent — no file written yet
+        return {"status": "captured", "message": "Test plan captured. Pipeline will save on completion."}, normalized_input
     return {"error": f"Unknown tool: {name}"}, None
 
 

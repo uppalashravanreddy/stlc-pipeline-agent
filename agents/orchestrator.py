@@ -14,6 +14,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from memory.pipeline_state import PipelineState
+from memory.summary_writer import save_pipeline_summary, save_debug_json, save_checkpoint_cache
 from agents.analysis_agent import AnalysisAgent
 from agents.generation_agent import GenerationAgent
 from agents.automation_agent import AutomationAgent
@@ -98,8 +99,10 @@ class Orchestrator:
         if resume_from < 2:
             state = self.analysis_agent.run(state)
             if not state.phase_1_test_plan:
-                _abort("Phase 0+1", "AnalysisAgent did not call save_test_plan. Check the log for FAIL events.")
+                _abort("Phase 0+1", "AnalysisAgent did not call save_test_plan.")
+                save_debug_json(state, "Phase 0+1 failed — save_test_plan not called")
                 return None
+            save_checkpoint_cache(state)   # internal .cache/ — not user output
         else:
             print("  [resume] Skipping Phase 0+1 — loaded from checkpoint\n")
 
@@ -109,6 +112,7 @@ class Orchestrator:
             _print_phase_01_summary(state)
             if not _hitl_prompt("Approve test plan and generate test cases?"):
                 state.hitl_approvals["gate_1"] = "rejected"
+                save_debug_json(state, "Pipeline aborted by user at Gate 1")
                 return state
             state.hitl_approvals["gate_1"] = "approved"
 
@@ -116,14 +120,17 @@ class Orchestrator:
         if resume_from < 4:
             state = self.generation_agent.run_phase_2(state)
             if not state.phase_2_test_cases:
-                _abort("Phase 2", "GenerationAgent did not call save_test_cases. Partial output saved to output/. Re-run with --ticket or check the log.")
+                _abort("Phase 2", "GenerationAgent did not call save_test_cases.")
+                save_debug_json(state, "Phase 2 failed — save_test_cases not called")
                 return state
+            save_checkpoint_cache(state)
         else:
             print("  [resume] Skipping Phase 2 — loaded from checkpoint\n")
 
         # ── Phase 3 (Review) ─────────────────────────────────────────────────
         if resume_from < 4:
             state = self.generation_agent.run_phase_3(state)
+            save_checkpoint_cache(state)
 
         # ── HITL Gate 2 ──────────────────────────────────────────────────────
         if resume_from < 4:
@@ -131,6 +138,7 @@ class Orchestrator:
             _print_phase_23_summary(state)
             if not _hitl_prompt("Approve test cases and generate automation?"):
                 state.hitl_approvals["gate_2"] = "rejected"
+                save_debug_json(state, "Pipeline aborted by user at Gate 2")
                 return state
             state.hitl_approvals["gate_2"] = "approved"
 
@@ -138,38 +146,44 @@ class Orchestrator:
         if resume_from < 6:
             state = self.automation_agent.run_phase_4(state)
             if not state.phase_4_automation:
-                _abort("Phase 4", "AutomationAgent did not call save_automation. Check log for HARD_STOP or FAIL events.")
+                _abort("Phase 4", "AutomationAgent did not call save_automation.")
+                save_debug_json(state, "Phase 4 failed — save_automation not called")
                 return state
+            save_checkpoint_cache(state)
         else:
             print("  [resume] Skipping Phase 4 — loaded from checkpoint\n")
 
         # ── Phase 5 (Automation Review) ──────────────────────────────────────
         if resume_from < 6:
             state = self.automation_agent.run_phase_5(state)
+            save_checkpoint_cache(state)
 
         # ── HITL Gate 3 ──────────────────────────────────────────────────────
         _banner("HITL GATE 3 — Final Sign-off")
         _print_phase_45_summary(state)
 
         if not _hitl_prompt("Approve automation and complete pipeline?"):
-            print("\n[Orchestrator] Pipeline aborted at Gate 3.")
             state.hitl_approvals["gate_3"] = "rejected"
+            save_debug_json(state, "Pipeline aborted by user at Gate 3")
             return state
         state.hitl_approvals["gate_3"] = "approved"
 
+        # ── SUCCESS — write ONE summary file ─────────────────────────────────
         _banner("PIPELINE COMPLETE")
         _print_final_summary(state)
+        summary_path = save_pipeline_summary(state)   # ONE .md file, all phases
 
         # Write pipeline end to log
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps({
-                "ts":            datetime.now().isoformat(),
-                "event":         "pipeline_complete",
-                "phases_done":   state.current_phase,
-                "test_cases":    len(state.phase_2_test_cases or []),
+                "ts":             datetime.now().isoformat(),
+                "event":          "pipeline_complete",
+                "phases_done":    state.current_phase,
+                "test_cases":     len(state.phase_2_test_cases or []),
                 "hitl_approvals": state.hitl_approvals,
+                "summary_file":   str(summary_path),
             }) + "\n")
-        print(f"\n  Full trace → logs/{log_path.name}")
+        print(f"  Trace   → logs/{log_path.name}")
 
         return state
 

@@ -97,13 +97,15 @@ PHASE_45_TOOLS: list[dict] = [
 
 
 def handle_phase_45_tool(name: str, tool_input: dict) -> tuple[dict, Any]:
-    """Returns (tool_result_for_api, captured_output)."""
+    """
+    Captures Phase 4+5 data WITHOUT writing files.
+    Orchestrator writes the final summary MD on completion.
+    """
     if name == "save_automation":
-        result = _save_automation_code(tool_input)
-        return result, ("phase_4", tool_input)
+        fn_count = len(tool_input.get("test_functions", []))
+        return {"status": "captured", "functions": fn_count}, ("phase_4", tool_input)
     if name == "save_automation_review":
-        result = _save_phase05(tool_input)
-        return result, ("phase_5", tool_input)
+        return {"status": "captured", "approved": tool_input.get("approved")}, ("phase_5", tool_input)
     return {"error": f"Unknown tool: {name}"}, None
 
 
