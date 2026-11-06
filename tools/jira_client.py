@@ -22,11 +22,7 @@ import json
 import urllib.request
 import urllib.error
 from pathlib import Path
-from dotenv import load_dotenv
 import os
-
-
-load_dotenv()
 
 
 class JiraClient:
@@ -35,19 +31,29 @@ class JiraClient:
     def __init__(self):
         self.base_url = os.getenv("JIRA_INSTANCE_URL", "").rstrip("/")
         self.email    = os.getenv("JIRA_USER_EMAIL", "")
-        self.token    = os.getenv("JIRA_API_TOKEN", "")
+        # Support both JIRA_API_KEY (Flask-Task-Manager convention) and JIRA_API_TOKEN
+        self.token = os.getenv("JIRA_API_KEY") or os.getenv("JIRA_API_TOKEN", "")
 
         if not all([self.base_url, self.email, self.token]):
             raise EnvironmentError(
                 "Missing Jira credentials. Add to .env:\n"
                 "  JIRA_INSTANCE_URL=https://yourcompany.atlassian.net\n"
                 "  JIRA_USER_EMAIL=your@email.com\n"
-                "  JIRA_API_TOKEN=your_token_here"
+                "  JIRA_API_KEY=your_token_here"
             )
 
-        self._auth = base64.b64encode(
-            f"{self.email}:{self.token}".encode()
-        ).decode()
+        # Auth strategy:
+        # Jira Cloud (*.atlassian.net)  → Basic auth: base64(email:token)
+        # Jira Data Center / Server     → Bearer auth: Personal Access Token
+        if "atlassian.net" in self.base_url:
+            encoded = base64.b64encode(f"{self.email}:{self.token}".encode()).decode()
+            self._auth_header = f"Basic {encoded}"
+        else:
+            # EPAM jiraeu.epam.com and other Data Center instances use PAT
+            self._auth_header = f"Bearer {self.token}"
+
+        # Jira Cloud uses API v3, Data Center uses v2
+        self._api_version = "3" if "atlassian.net" in self.base_url else "2"
 
     def fetch_story(self, ticket_key: str) -> dict:
         """
@@ -60,13 +66,18 @@ class JiraClient:
         Raises:
           ValueError if the ticket is not found or credentials are wrong.
         """
-        url  = f"{self.base_url}/rest/api/3/issue/{ticket_key}"
+        url  = f"{self.base_url}/rest/api/{self._api_version}/issue/{ticket_key}"
         data = self._get(url)
 
         fields  = data.get("fields", {})
         summary = fields.get("summary", ticket_key)
 
-        description_text = _parse_adf(fields.get("description") or {})
+        raw_desc = fields.get("description") or {}
+        # v2 (Data Center) returns description as plain string, v3 (Cloud) as ADF dict
+        if isinstance(raw_desc, str):
+            description_text = raw_desc
+        else:
+            description_text = _parse_adf(raw_desc)
         ac_text          = _extract_acceptance_criteria(fields)
 
         user_story = description_text
@@ -87,7 +98,7 @@ class JiraClient:
         req = urllib.request.Request(
             url,
             headers={
-                "Authorization": f"Basic {self._auth}",
+                "Authorization": self._auth_header,
                 "Accept":        "application/json",
             },
         )
