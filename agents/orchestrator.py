@@ -10,10 +10,15 @@ CAPSTONE CONCEPTS DEMONSTRATED:
   - Memory Types: PipelineState is the shared memory passed between agents.
       The orchestrator owns it and passes it to each sub-agent by reference.
 """
+import json
+from datetime import datetime
+from pathlib import Path
 from memory.pipeline_state import PipelineState
 from agents.analysis_agent import AnalysisAgent
 from agents.generation_agent import GenerationAgent
 from agents.automation_agent import AutomationAgent
+
+LOGS_DIR = Path(__file__).parent.parent / "logs"
 
 
 class Orchestrator:
@@ -61,6 +66,28 @@ class Orchestrator:
         """
         _banner("STLC PIPELINE — ADVANCED  (Phases 0–5)")
         print(f"  Feature : {feature_name}\n")
+
+        # CAPSTONE: Observability — create a log file for this run
+        LOGS_DIR.mkdir(exist_ok=True)
+        slug = feature_name.lower().replace(" ", "_")[:30]
+        slug = "".join(c for c in slug if c.isalnum() or c == "_")
+        ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_path = LOGS_DIR / f"{slug}_{ts}.jsonl"
+
+        # Write the pipeline header to the log
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "ts":           datetime.now().isoformat(),
+                "event":        "pipeline_start",
+                "feature":      feature_name,
+                "log_file":     log_path.name,
+            }) + "\n")
+
+        # Share the log path with all sub-agents
+        self.analysis_agent.log_path   = log_path
+        self.generation_agent.log_path = log_path
+        self.automation_agent.log_path = log_path
+        print(f"  Log     : logs/{log_path.name}\n")
 
         # CAPSTONE: Memory Types — PipelineState is the shared working memory
         state = PipelineState(feature_name=feature_name, user_story=user_story)
@@ -121,6 +148,18 @@ class Orchestrator:
 
         _banner("PIPELINE COMPLETE")
         _print_final_summary(state)
+
+        # Write pipeline end to log
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "ts":            datetime.now().isoformat(),
+                "event":         "pipeline_complete",
+                "phases_done":   state.current_phase,
+                "test_cases":    len(state.phase_2_test_cases or []),
+                "hitl_approvals": state.hitl_approvals,
+            }) + "\n")
+        print(f"\n  Full trace → logs/{log_path.name}")
+
         return state
 
 

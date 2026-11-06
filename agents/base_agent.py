@@ -1,45 +1,66 @@
 """
 CAPSTONE CONCEPTS DEMONSTRATED:
-  - Hard Stops: max_iterations cap enforced in run_loop() — every agent inherits this
-  - Observability: _log() is the single place all agent activity is recorded;
-      extend this method to emit spans to LangSmith, OpenTelemetry, or any tracer
+  - Hard Stops: max_iterations cap enforced in run_loop()
+  - Observability: _log() writes to console AND a structured JSONL log file.
+      Every agent event — iterations, token counts, tool calls, hard stops —
+      is recorded with a timestamp. Open logs/ after a run to see the full trace.
   - Agent Configurations: config dataclass carries model + limits per agent
 """
 import json
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Optional
 import anthropic
 from config.agent_configs import AgentConfig
+
+LOGS_DIR = Path(__file__).parent.parent / "logs"
 
 
 class BaseAgent:
     """
     All sub-agents inherit this class.
-
-    Two things every agent must have:
-    1. A config that specifies its model, token budget, and iteration cap
-    2. An agentic loop that enforces those limits and logs every step
-
-    The agentic loop is NOT in __init__ because different agents call it with
-    different system prompts and tool sets. Subclasses call run_loop() once per
-    phase, passing the appropriate prompt and a tool handler callback.
+    Set agent.log_path before calling run_loop() to enable file logging.
+    The orchestrator sets this at the start of each pipeline run.
     """
 
     def __init__(self, config: AgentConfig, tools: list[dict]):
-        self.config = config
-        self.tools = tools
-        self.client = anthropic.Anthropic()
+        self.config  = config
+        self.tools   = tools
+        self.client  = anthropic.Anthropic()
+        self.log_path: Optional[Path] = None   # set by orchestrator
 
-    def _log(self, event: str, detail: str = "") -> None:
+    # ── Observability ─────────────────────────────────────────────────────────
+
+    def _log(self, event: str, detail: str = "", **extra) -> None:
         """
         CAPSTONE: Observability
 
-        Every agent action goes through here: tool calls, token counts, hard stops.
-        In production this would emit a span — replace the print with:
-            tracer.add_event(agent=self.config.name, event=event, detail=detail)
-        For now, structured console output is sufficient for the demo.
+        Writes every agent event to:
+          1. Console (immediate visibility during the run)
+          2. JSONL log file (persistent audit trail — open after the run)
+
+        Each log entry captures:
+          timestamp, agent name, event type, detail, and any extra fields
+          (tokens_in, tokens_out, stop_reason, tool_name, iteration)
+
+        In production: replace the file write with a LangSmith span:
+            tracer.add_event(name=event, metadata={...})
         """
         tag = f"[{self.config.name.upper():12}]"
         print(f"{tag} {event}" + (f"  {detail}" if detail else ""))
+
+        if self.log_path:
+            entry = {
+                "ts":     datetime.now(timezone.utc).isoformat(),
+                "agent":  self.config.name,
+                "event":  event,
+                "detail": detail,
+                **extra,
+            }
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry) + "\n")
+
+    # ── Agentic loop ──────────────────────────────────────────────────────────
 
     def run_loop(
         self,
@@ -50,20 +71,8 @@ class BaseAgent:
         """
         CAPSTONE: Hard Stops + Observability
 
-        Runs the agentic loop until:
-        - stop_reason == "end_turn"  (agent finished)
-        - max_iterations reached     (HARD STOP — safety cap)
-
-        Args:
-            on_tool_call: called when the agent uses a tool.
-                          Returns (tool_result_dict, captured_output_or_None).
-                          captured_output is what the caller cares about (e.g. the
-                          structured data from a save_* tool). If the tool isn't the
-                          "result tool", return (result_dict, None).
-
-        Returns:
-            The last non-None captured_output from on_tool_call, or None if the
-            agent never called a result tool.
+        Runs until end_turn, tool_use handled, or max_iterations (HARD STOP).
+        Handles max_tokens by nudging the agent to call the tool immediately.
         """
         messages = [{"role": "user", "content": user_message}]
         result: Optional[Any] = None
@@ -77,16 +86,19 @@ class BaseAgent:
                 messages=messages,
             )
 
-            # CAPSTONE: Observability — token usage logged every call
+            # Log every iteration with token counts and stop reason
             self._log(
                 f"iter {iteration}/{self.config.max_iterations}",
                 f"model={self.config.model}  "
                 f"in={response.usage.input_tokens}  "
                 f"out={response.usage.output_tokens}  "
                 f"stop={response.stop_reason}",
+                iteration=iteration,
+                tokens_in=response.usage.input_tokens,
+                tokens_out=response.usage.output_tokens,
+                stop_reason=response.stop_reason,
             )
 
-            # Print agent's visible reasoning
             for block in response.content:
                 if hasattr(block, "text") and block.text.strip():
                     print(f"\n  [{self.config.name}] {block.text.strip()}\n")
@@ -95,9 +107,22 @@ class BaseAgent:
                 self._log("done")
                 break
 
+            if response.stop_reason == "max_tokens":
+                self._log("max_tokens_hit", "nudging agent to call tool now")
+                messages.append({"role": "assistant", "content": response.content})
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "You were cut off at the token limit. "
+                        "Call the save tool NOW with whatever you have generated so far. "
+                        "Do not re-plan or regenerate — just call the tool immediately."
+                    ),
+                })
+                continue
+
             if response.stop_reason == "tool_use":
                 tool_block = next(b for b in response.content if b.type == "tool_use")
-                self._log("tool_call", tool_block.name)
+                self._log("tool_call", tool_block.name, tool=tool_block.name)
 
                 tool_result, captured = on_tool_call(tool_block.name, tool_block.input)
                 if captured is not None:
@@ -114,10 +139,10 @@ class BaseAgent:
                 })
 
         else:
-            # CAPSTONE: Hard Stop — loop exhausted max_iterations without end_turn
             self._log(
-                "HARD STOP",
-                f"reached max_iterations={self.config.max_iterations} — loop terminated",
+                "HARD_STOP",
+                f"reached max_iterations={self.config.max_iterations}",
+                max_iterations=self.config.max_iterations,
             )
 
         return result
