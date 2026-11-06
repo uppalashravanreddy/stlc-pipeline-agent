@@ -1,12 +1,13 @@
 """
 Tools for Phase 0 (Classification) and Phase 1 (Test Plan).
-Moved from tools.py — same schema, restructured for multi-agent use.
+
+Output strategy:
+  Tools CAPTURE only — no file writing during execution.
+  On success: orchestrator writes output/<ID>/stlc_summary_*.md  (one file)
+  On failure: orchestrator writes output/<ID>/debug_phase<N>_*.json  (one file)
 """
 import json
-from datetime import datetime
-from pathlib import Path
 from typing import Any
-from tools.output_utils import get_story_dir
 
 PHASE_01_TOOLS: list[dict] = [
     {
@@ -82,75 +83,5 @@ def _normalize_tool_input(tool_input: dict) -> dict | None:
     return None
 
 
-def _save_test_plan(data: dict) -> dict:
-    story_dir = get_story_dir(data["feature_name"])
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    json_path = story_dir / f"01_test_plan_{ts}.json"
-    json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-    md_path = story_dir / f"01_test_plan_{ts}.md"
-    md_path.write_text(_build_markdown(data), encoding="utf-8")
-
-    print(f"  [tool] saved → {story_dir.name}/{md_path.name}")
-    print(f"  [tool] saved → {story_dir.name}/{json_path.name}")
-    return {"status": "success", "markdown": str(md_path), "json": str(json_path)}
-
-
-def _build_markdown(data: dict) -> str:
-    c = data["phase_0_classification"]
-    p = data["phase_1_test_plan"]
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    lines = [
-        f"# Test Plan: {data['feature_name']}",
-        f"_Generated: {ts}_",
-        "",
-        "---",
-        "",
-        "## Phase 0 — Classification",
-        "",
-        "| Field | Value |",
-        "|---|---|",
-        f"| Test Type | `{c['test_type']}` |",
-        f"| Risk Level | `{c['risk_level']}` |",
-        f"| Test Approach | `{c['test_approach']}` |",
-        f"| Priority | `{c['priority']}` |",
-        "",
-        f"**Rationale:** {c['rationale']}",
-        "",
-        "---",
-        "",
-        "## Phase 1 — Test Plan",
-        "",
-        "### Objectives",
-    ]
-    for obj in p.get("objectives", []):
-        lines.append(f"- {obj}")
-
-    lines += ["", "### Scope", "", "**In Scope:**"]
-    for item in p.get("in_scope", []):
-        lines.append(f"- {item}")
-
-    lines += ["", "**Out of Scope:**"]
-    for item in p.get("out_of_scope", []):
-        lines.append(f"- {item}")
-
-    lines += ["", "### Test Scenarios", ""]
-    for i, scenario in enumerate(p.get("test_scenarios", []), start=1):
-        lines.append(f"{i}. {scenario}")
-
-    lines += ["", "### Entry Criteria"]
-    for item in p.get("entry_criteria", []):
-        lines.append(f"- {item}")
-
-    lines += ["", "### Exit Criteria"]
-    for item in p.get("exit_criteria", []):
-        lines.append(f"- {item}")
-
-    return "\n".join(lines)
-
-
-def _slugify(text: str) -> str:  # kept for _build_markdown internal use
-    slug = text.lower().replace(" ", "_").replace("—", "").replace("-", "_")
-    return "".join(c for c in slug if c.isalnum() or c == "_")
+# All file writing removed. Data flows:
+#   tool call → handle_phase_01_tool (capture) → PipelineState → summary_writer.py

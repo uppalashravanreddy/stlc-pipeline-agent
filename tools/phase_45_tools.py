@@ -1,11 +1,12 @@
 """
 Tools for Phase 4 (Automation Generate) and Phase 5 (Automation Review).
+
+Output strategy:
+  Tools CAPTURE only — no file writing during execution.
+  On success: orchestrator calls memory/summary_writer.py → one stlc_summary_*.md
+  On failure: orchestrator calls memory/summary_writer.py → one debug_*.json
 """
-import json
-from datetime import datetime
-from pathlib import Path
 from typing import Any
-from tools.output_utils import get_story_dir
 
 PHASE_45_TOOLS: list[dict] = [
     {
@@ -109,48 +110,5 @@ def handle_phase_45_tool(name: str, tool_input: dict) -> tuple[dict, Any]:
     return {"error": f"Unknown tool: {name}"}, None
 
 
-def _save_automation_code(data: dict) -> dict:
-    story_dir = get_story_dir(data.get("feature_name", "unknown"))
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_path = story_dir / f"04_automation_{ts}.json"
-    json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-    py_path = story_dir / data.get("test_file_name", f"04_automation_{ts}.py")
-    lines = []
-    for imp in data.get("imports", []):
-        lines.append(imp)
-    if lines:
-        lines.append("")
-
-    for fixture in data.get("fixtures", []):
-        lines.append(f"@pytest.fixture(scope=\"{fixture['scope']}\")")
-        lines.append(fixture["code"])
-        lines.append("")
-
-    for fn in data.get("test_functions", []):
-        if fn.get("docstring"):
-            lines.append(f'def {fn["function_name"]}():')
-            lines.append(f'    """{fn["docstring"]}"""')
-        else:
-            lines.append(f'def {fn["function_name"]}():')
-        lines.append(fn["code"])
-        lines.append("")
-
-    py_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"  [tool] saved → {story_dir.name}/{py_path.name}")
-    print(f"  [tool] saved → {story_dir.name}/{json_path.name}")
-    return {"status": "success", "json_file": str(json_path), "py_file": str(py_path)}
-
-
-def _save_phase05(data: dict) -> dict:
-    story_dir = get_story_dir(data.get("feature_name", "unknown"))
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = story_dir / f"05_automation_review_{ts}.json"
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    print(f"  [tool] saved → {story_dir.name}/{path.name}")
-    return {"status": "success", "file": str(path)}
-
-
-def _slugify(text: str) -> str:
-    slug = text.lower().replace(" ", "_").replace("—", "").replace("-", "_")
-    return "".join(c for c in slug if c.isalnum() or c == "_")
+# All file writing removed.
+# Data flows: tool call → handle_phase_45_tool (capture) → PipelineState → summary_writer.py
