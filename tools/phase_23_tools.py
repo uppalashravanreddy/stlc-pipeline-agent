@@ -5,8 +5,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-OUTPUT_DIR = Path(__file__).parent.parent / "output"
+from tools.output_utils import get_story_dir
 
 PHASE_23_TOOLS: list[dict] = [
     {
@@ -107,38 +106,32 @@ def handle_phase_23_tool(name: str, tool_input: dict) -> tuple[dict, Any]:
 
 
 def _save_test_cases(data: dict) -> dict:
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    slug = _slugify(data.get("feature_name", "unknown"))
-    ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+    story_dir = get_story_dir(data.get("feature_name", "unknown"))
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # JSON
-    json_path = OUTPUT_DIR / f"{slug}_phase02_{ts}.json"
+    json_path = story_dir / f"phase02_{ts}.json"
     json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    # Markdown — readable test case document
-    md_path = OUTPUT_DIR / f"{slug}_phase02_{ts}.md"
+    md_path = story_dir / f"phase02_{ts}.md"
     md_path.write_text(_build_test_cases_md(data), encoding="utf-8")
 
-    print(f"  [tool] saved → {md_path.name}")
-    print(f"  [tool] saved → {json_path.name}")
+    print(f"  [tool] saved → {story_dir.name}/{md_path.name}")
+    print(f"  [tool] saved → {story_dir.name}/{json_path.name}")
     return {"status": "success", "markdown": str(md_path), "json": str(json_path)}
 
 
 def _save_review(data: dict) -> dict:
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    slug = _slugify(data.get("feature_name", "unknown"))
-    ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+    story_dir = get_story_dir(data.get("feature_name", "unknown"))
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # JSON
-    json_path = OUTPUT_DIR / f"{slug}_phase03_{ts}.json"
+    json_path = story_dir / f"phase03_{ts}.json"
     json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    # Markdown
-    md_path = OUTPUT_DIR / f"{slug}_phase03_{ts}.md"
+    md_path = story_dir / f"phase03_{ts}.md"
     md_path.write_text(_build_review_md(data), encoding="utf-8")
 
-    print(f"  [tool] saved → {md_path.name}")
-    print(f"  [tool] saved → {json_path.name}")
+    print(f"  [tool] saved → {story_dir.name}/{md_path.name}")
+    print(f"  [tool] saved → {story_dir.name}/{json_path.name}")
     return {"status": "success", "markdown": str(md_path), "json": str(json_path)}
 
 
@@ -245,14 +238,9 @@ def _build_review_md(data: dict) -> str:
     return "\n".join(lines)
 
 
-def _save_json(data: dict, phase_tag: str) -> dict:
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    slug = _slugify(data.get("feature_name", "unknown"))
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = OUTPUT_DIR / f"{slug}_{phase_tag}_{ts}.json"
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    print(f"  [tool] saved → {path.name}")
-    return {"status": "success", "file": str(path)}
+def _slugify(text: str) -> str:
+    slug = text.lower().replace(" ", "_").replace("—", "").replace("-", "_")
+    return "".join(c for c in slug if c.isalnum() or c == "_")
 
 
 def _slugify(text: str) -> str:

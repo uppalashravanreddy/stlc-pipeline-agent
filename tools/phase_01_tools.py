@@ -6,8 +6,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-OUTPUT_DIR = Path(__file__).parent.parent / "output"
+from tools.output_utils import get_story_dir
 
 PHASE_01_TOOLS: list[dict] = [
     {
@@ -85,20 +84,17 @@ def _normalize_tool_input(tool_input: dict) -> dict | None:
 
 
 def _save_test_plan(data: dict) -> dict:
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    slug = _slugify(data["feature_name"])
+    story_dir = get_story_dir(data["feature_name"])
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Save JSON
-    json_path = OUTPUT_DIR / f"{slug}_phase01_{ts}.json"
+    json_path = story_dir / f"phase01_{ts}.json"
     json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    # Save Markdown — readable artifact for demo and mentor review
-    md_path = OUTPUT_DIR / f"{slug}_phase01_{ts}.md"
+    md_path = story_dir / f"phase01_{ts}.md"
     md_path.write_text(_build_markdown(data), encoding="utf-8")
 
-    print(f"  [tool] saved → {md_path.name}")
-    print(f"  [tool] saved → {json_path.name}")
+    print(f"  [tool] saved → {story_dir.name}/{md_path.name}")
+    print(f"  [tool] saved → {story_dir.name}/{json_path.name}")
     return {"status": "success", "markdown": str(md_path), "json": str(json_path)}
 
 
@@ -156,6 +152,6 @@ def _build_markdown(data: dict) -> str:
     return "\n".join(lines)
 
 
-def _slugify(text: str) -> str:
+def _slugify(text: str) -> str:  # kept for _build_markdown internal use
     slug = text.lower().replace(" ", "_").replace("—", "").replace("-", "_")
     return "".join(c for c in slug if c.isalnum() or c == "_")

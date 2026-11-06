@@ -5,8 +5,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-OUTPUT_DIR = Path(__file__).parent.parent / "output"
+from tools.output_utils import get_story_dir
 
 PHASE_45_TOOLS: list[dict] = [
     {
@@ -103,22 +102,18 @@ def handle_phase_45_tool(name: str, tool_input: dict) -> tuple[dict, Any]:
         result = _save_automation_code(tool_input)
         return result, ("phase_4", tool_input)
     if name == "save_automation_review":
-        result = _save_json(tool_input, "phase05")
+        result = _save_phase05(tool_input)
         return result, ("phase_5", tool_input)
     return {"error": f"Unknown tool: {name}"}, None
 
 
 def _save_automation_code(data: dict) -> dict:
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    slug = _slugify(data.get("feature_name", "unknown"))
+    story_dir = get_story_dir(data.get("feature_name", "unknown"))
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    # Save JSON metadata
-    json_path = OUTPUT_DIR / f"{slug}_phase04_{ts}.json"
+    json_path = story_dir / f"phase04_{ts}.json"
     json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    # Write actual Python test file
-    py_path = OUTPUT_DIR / data.get("test_file_name", f"{slug}_test_{ts}.py")
+    py_path = story_dir / data.get("test_file_name", f"phase04_{ts}.py")
     lines = []
     for imp in data.get("imports", []):
         lines.append(imp)
@@ -140,18 +135,17 @@ def _save_automation_code(data: dict) -> dict:
         lines.append("")
 
     py_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"  [tool] saved → {json_path.name}")
-    print(f"  [tool] saved → {py_path.name}")
+    print(f"  [tool] saved → {story_dir.name}/{json_path.name}")
+    print(f"  [tool] saved → {story_dir.name}/{py_path.name}")
     return {"status": "success", "json_file": str(json_path), "py_file": str(py_path)}
 
 
-def _save_json(data: dict, phase_tag: str) -> dict:
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    slug = _slugify(data.get("feature_name", "unknown"))
+def _save_phase05(data: dict) -> dict:
+    story_dir = get_story_dir(data.get("feature_name", "unknown"))
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = OUTPUT_DIR / f"{slug}_{phase_tag}_{ts}.json"
+    path = story_dir / f"phase05_{ts}.json"
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    print(f"  [tool] saved → {path.name}")
+    print(f"  [tool] saved → {story_dir.name}/{path.name}")
     return {"status": "success", "file": str(path)}
 
 

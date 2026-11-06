@@ -14,26 +14,27 @@ import json
 from pathlib import Path
 from memory.pipeline_state import PipelineState
 
-OUTPUT_DIR = Path(__file__).parent.parent / "output"
-
-
-def _slugify(text: str) -> str:
-    slug = text.lower().replace(" ", "_").replace("—", "").replace("-", "_")
-    return "".join(c for c in slug if c.isalnum() or c == "_")
+from tools.output_utils import get_story_dir
+BASE_OUTPUT = Path(__file__).parent.parent / "output"
 
 
 def find_existing_checkpoint(feature_name: str) -> dict:
     """
-    Look for existing phase output files for this feature.
-    Returns a dict: {phase_num: latest_file_path} for phases that have output.
+    Look inside output/<STORY-ID>/ for existing phase output files.
+    Returns {phase_num: latest_file_path} for phases that have output.
     """
-    slug = _slugify(feature_name)[:40]
-    found = {}
+    import re
+    match = re.match(r"^([A-Z]+-\d+)", feature_name.strip())
+    folder = match.group(1) if match else feature_name[:25]
+    story_dir = BASE_OUTPUT / folder
 
+    if not story_dir.exists():
+        return {}
+
+    found = {}
     for phase_tag, phase_num in [("phase01", 1), ("phase02", 2), ("phase03", 3), ("phase04", 4), ("phase05", 5)]:
-        # Find the latest file for this phase
         matches = sorted(
-            OUTPUT_DIR.glob(f"{slug}*{phase_tag}*.json"),
+            story_dir.glob(f"{phase_tag}*.json"),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )
