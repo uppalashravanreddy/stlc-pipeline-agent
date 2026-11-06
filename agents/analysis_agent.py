@@ -86,6 +86,7 @@ class AnalysisAgent(BaseAgent):
             system_prompt=prompt_with_skills,
             user_message=user_message,
             on_tool_call=handle_phase_01_tool,
+            phase_label="Phase 0+1 — Classify + Test Plan",
         )
 
         if results:

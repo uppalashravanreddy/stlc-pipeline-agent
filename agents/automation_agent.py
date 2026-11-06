@@ -101,6 +101,7 @@ class AutomationAgent(BaseAgent):
             system_prompt=PHASE_4_SYSTEM_PROMPT,
             user_message=user_message,
             on_tool_call=handle_phase_45_tool,
+            phase_label="Phase 4 — Automation Generation",
         )
 
         for phase_tag, data in results:
@@ -135,6 +136,7 @@ class AutomationAgent(BaseAgent):
             system_prompt=PHASE_5_SYSTEM_PROMPT,
             user_message=user_message,
             on_tool_call=handle_phase_45_tool,
+            phase_label="Phase 5 — Automation Review",
         )
 
         for phase_tag, data in results:

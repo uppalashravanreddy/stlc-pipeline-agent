@@ -115,6 +115,7 @@ class GenerationAgent(BaseAgent):
             system_prompt=PHASE_2_SYSTEM_PROMPT.format(skill=_SKILL_PHASE2),
             user_message=user_message,
             on_tool_call=handle_phase_23_tool,
+            phase_label="Phase 2 — Test Case Generation",
         )
 
         # Agent may call both save_test_cases AND save_review in one loop — handle both
@@ -158,6 +159,7 @@ class GenerationAgent(BaseAgent):
             system_prompt=PHASE_3_SYSTEM_PROMPT.format(skill=_SKILL_PHASE3),
             user_message=user_message,
             on_tool_call=handle_phase_23_tool,
+            phase_label="Phase 3 — Test Case Review",
         )
 
         for phase_tag, data in results:

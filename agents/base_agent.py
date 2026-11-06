@@ -67,35 +67,49 @@ class BaseAgent:
         system_prompt: str,
         user_message: str,
         on_tool_call: Callable[[str, dict], tuple[dict, Optional[Any]]],
+        phase_label: str = "",          # e.g. "Phase 0+1 — Classify + Test Plan"
     ) -> Optional[Any]:
         """
         CAPSTONE: Hard Stops + Observability
 
         Runs until end_turn, tool_use handled, or max_iterations (HARD STOP).
         Handles max_tokens by nudging the agent to call the tool immediately.
+
+        phase_label: shown in every log line so you know which phase is running,
+                     what the token budget is, and what percentage is consumed.
         """
         messages = [{"role": "user", "content": user_message}]
-        results: list = []   # collect ALL tool results, not just the last
+        results: list = []
+        budget = self.config.max_tokens   # total output tokens this agent can use
 
         for iteration in range(1, self.config.max_iterations + 1):
             response = self.client.messages.create(
                 model=self.config.model,
-                max_tokens=self.config.max_tokens,
+                max_tokens=budget,
                 system=system_prompt,
                 tools=self.tools,
                 messages=messages,
             )
 
-            # Log every iteration with token counts and stop reason
+            out_tokens = response.usage.output_tokens
+            in_tokens  = response.usage.input_tokens
+            pct_used   = round(out_tokens / budget * 100, 1)
+
+            # Structured log line:
+            # [AGENT       ] Phase X — label | iter N/M | model | budget=N | in=N | out=N/budget (N%) | stop=reason
             self._log(
-                f"iter {iteration}/{self.config.max_iterations}",
-                f"model={self.config.model}  "
-                f"in={response.usage.input_tokens}  "
-                f"out={response.usage.output_tokens}  "
+                f"{phase_label} | iter {iteration}/{self.config.max_iterations}",
+                f"model={self.config.model} | "
+                f"budget={budget:,} | "
+                f"in={in_tokens:,} | "
+                f"out={out_tokens:,}/{budget:,} ({pct_used}%) | "
                 f"stop={response.stop_reason}",
                 iteration=iteration,
-                tokens_in=response.usage.input_tokens,
-                tokens_out=response.usage.output_tokens,
+                phase=phase_label,
+                tokens_in=in_tokens,
+                tokens_out=out_tokens,
+                token_budget=budget,
+                pct_budget_used=pct_used,
                 stop_reason=response.stop_reason,
             )
 
