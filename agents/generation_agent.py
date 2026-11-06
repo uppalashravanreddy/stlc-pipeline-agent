@@ -37,8 +37,13 @@ Aim for: ~40% Positive, ~35% Negative, ~25% Edge Case
 If Phase 0 test_type is Security: add at least one Security test case.
 If Phase 0 risk_level is High: at least one Edge Case per scenario.
 
+## HARD LIMIT
+Generate a MAXIMUM of 8 test cases total. Do not plan more than 8.
+Quality over quantity — 8 well-written cases beat 15 vague ones.
+
 ## RULE
-Only call save_test_cases when ALL test cases are generated.
+Do NOT write a planning outline first. Generate test cases directly and
+call save_test_cases immediately when done. Never exceed 8 cases.
 """
 
 PHASE_3_SYSTEM_PROMPT = """\
@@ -98,20 +103,25 @@ class GenerationAgent(BaseAgent):
             "Call save_test_cases when all are complete."
         )
 
-        result = self.run_loop(
+        results = self.run_loop(
             system_prompt=PHASE_2_SYSTEM_PROMPT,
             user_message=user_message,
             on_tool_call=handle_phase_23_tool,
         )
 
-        if result:
-            phase_tag, data = result
+        # Agent may call both save_test_cases AND save_review in one loop — handle both
+        for phase_tag, data in results:
             if phase_tag == "phase_2":
                 state.phase_2_test_cases = data
                 state.current_phase = 2
                 self._log("phase 2 complete", f"{len(data)} test cases")
-        else:
-            self._log("WARNING", "no test cases captured")
+            elif phase_tag == "phase_3":
+                state.phase_3_review = data
+                state.current_phase = 3
+                self._log("phase 3 also captured in same loop", f"approved={data.get('approved')}")
+
+        if not state.phase_2_test_cases:
+            self._log("FAIL", "save_test_cases was never called — no test cases in output")
 
         return state
 
@@ -136,19 +146,19 @@ class GenerationAgent(BaseAgent):
             "Call save_review when complete."
         )
 
-        result = self.run_loop(
+        results = self.run_loop(
             system_prompt=PHASE_3_SYSTEM_PROMPT,
             user_message=user_message,
             on_tool_call=handle_phase_23_tool,
         )
 
-        if result:
-            phase_tag, data = result
+        for phase_tag, data in results:
             if phase_tag == "phase_3":
                 state.phase_3_review = data
                 state.current_phase = 3
                 self._log("phase 3 complete", f"approved={data.get('approved')} score={data.get('coverage_score')}")
-        else:
-            self._log("WARNING", "no review captured")
+
+        if not state.phase_3_review:
+            self._log("FAIL", "save_review was never called — no review in output")
 
         return state

@@ -75,7 +75,7 @@ class BaseAgent:
         Handles max_tokens by nudging the agent to call the tool immediately.
         """
         messages = [{"role": "user", "content": user_message}]
-        result: Optional[Any] = None
+        results: list = []   # collect ALL tool results, not just the last
 
         for iteration in range(1, self.config.max_iterations + 1):
             response = self.client.messages.create(
@@ -126,7 +126,7 @@ class BaseAgent:
 
                 tool_result, captured = on_tool_call(tool_block.name, tool_block.input)
                 if captured is not None:
-                    result = captured
+                    results.append(captured)   # keep every result, not just last
 
                 messages.append({"role": "assistant", "content": response.content})
                 messages.append({
@@ -145,4 +145,4 @@ class BaseAgent:
                 max_iterations=self.config.max_iterations,
             )
 
-        return result
+        return results   # list of all captured outputs (may be empty)

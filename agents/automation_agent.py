@@ -89,21 +89,21 @@ class AutomationAgent(BaseAgent):
             "Call save_automation when all test functions are ready."
         )
 
-        result = self.run_loop(
+        results = self.run_loop(
             system_prompt=PHASE_4_SYSTEM_PROMPT,
             user_message=user_message,
             on_tool_call=handle_phase_45_tool,
         )
 
-        if result:
-            phase_tag, data = result
+        for phase_tag, data in results:
             if phase_tag == "phase_4":
                 state.phase_4_automation = data
                 state.current_phase = 4
                 fn_count = len(data.get("test_functions", []))
                 self._log("phase 4 complete", f"{fn_count} test functions")
-        else:
-            self._log("WARNING", "no automation captured")
+
+        if not state.phase_4_automation:
+            self._log("FAIL", "save_automation was never called — no automation code in output")
 
         return state
 
@@ -123,19 +123,19 @@ class AutomationAgent(BaseAgent):
             "Review this automation code. Call save_automation_review when complete."
         )
 
-        result = self.run_loop(
+        results = self.run_loop(
             system_prompt=PHASE_5_SYSTEM_PROMPT,
             user_message=user_message,
             on_tool_call=handle_phase_45_tool,
         )
 
-        if result:
-            phase_tag, data = result
+        for phase_tag, data in results:
             if phase_tag == "phase_5":
                 state.phase_5_automation_review = data
                 state.current_phase = 5
                 self._log("phase 5 complete", f"approved={data.get('approved')} score={data.get('quality_score')}")
-        else:
-            self._log("WARNING", "no automation review captured")
+
+        if not state.phase_5_automation_review:
+            self._log("FAIL", "save_automation_review was never called — no review in output")
 
         return state

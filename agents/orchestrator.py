@@ -95,7 +95,7 @@ class Orchestrator:
         # ── Phase 0 + 1 ─────────────────────────────────────────────────────
         state = self.analysis_agent.run(state)
         if not state.phase_1_test_plan:
-            print("\n[Orchestrator] Phase 0+1 failed — aborting pipeline.")
+            _abort("Phase 0+1", "AnalysisAgent did not call save_test_plan. Check the log for FAIL events.")
             return None
 
         # ── HITL Gate 1 ──────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ class Orchestrator:
         # ── Phase 2 (Test Cases) ─────────────────────────────────────────────
         state = self.generation_agent.run_phase_2(state)
         if not state.phase_2_test_cases:
-            print("\n[Orchestrator] Phase 2 failed — aborting pipeline.")
+            _abort("Phase 2", "GenerationAgent did not call save_test_cases. Partial output saved to output/. Re-run with --ticket or check the log.")
             return state
 
         # ── Phase 3 (Review) ─────────────────────────────────────────────────
@@ -130,7 +130,7 @@ class Orchestrator:
         # ── Phase 4 (Automation Generate) ────────────────────────────────────
         state = self.automation_agent.run_phase_4(state)
         if not state.phase_4_automation:
-            print("\n[Orchestrator] Phase 4 failed — aborting pipeline.")
+            _abort("Phase 4", "AutomationAgent did not call save_automation. Check log for HARD_STOP or FAIL events.")
             return state
 
         # ── Phase 5 (Automation Review) ──────────────────────────────────────
@@ -192,6 +192,17 @@ def _hitl_prompt(message: str) -> bool:
 
 
 # ── Print helpers ─────────────────────────────────────────────────────────────
+
+def _abort(phase: str, reason: str) -> None:
+    print(f"\n{'!'*60}")
+    print(f"  PIPELINE ABORTED — {phase}")
+    print(f"  Reason : {reason}")
+    print(f"  What to do:")
+    print(f"    1. Check logs/ for FAIL or HARD_STOP events")
+    print(f"    2. Check output/ — completed phases are saved")
+    print(f"    3. Re-run: python main.py --ticket <ID>")
+    print(f"{'!'*60}\n")
+
 
 def _banner(title: str) -> None:
     print(f"\n{'═' * 62}")

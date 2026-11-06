@@ -70,18 +70,19 @@ class AnalysisAgent(BaseAgent):
             "Call save_test_plan when both are complete."
         )
 
-        result = self.run_loop(
+        results = self.run_loop(
             system_prompt=SYSTEM_PROMPT,
             user_message=user_message,
             on_tool_call=handle_phase_01_tool,
         )
 
-        if result:
+        if results:
+            result = results[0]
             state.phase_0_classification = result["phase_0_classification"]
             state.phase_1_test_plan = result["phase_1_test_plan"]
             state.current_phase = 1
             self._log("phase 0+1 complete")
         else:
-            self._log("WARNING", "no result captured — save_test_plan was not called")
+            self._log("FAIL", "save_test_plan was never called — agent did not complete both phases")
 
         return state
