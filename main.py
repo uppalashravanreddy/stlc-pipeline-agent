@@ -44,10 +44,17 @@ def main() -> None:
         print("[Error] ANTHROPIC_API_KEY not set. Add it to .env")
         sys.exit(1)
 
-    # ── CAPSTONE: MCP — fetch story from Jira by ticket ID ───────────────────
+    # ── CAPSTONE: MCP + Skill — fetch story from Jira by ticket ID ──────────
     if args.ticket:
         try:
             from tools.jira_client import JiraClient
+            from memory.skill_loader import load_skill
+            # fetch-user-story skill defines HOW to validate and format a Jira story
+            # It runs here (entry point) before the pipeline starts
+            _fetch_skill = load_skill("fetch-user-story")
+            if _fetch_skill:
+                print(f"  [skills] fetch-user-story loaded")
+
             print(f"\n[MCP] Fetching {args.ticket} from Jira...")
             jira    = JiraClient()
             story   = jira.fetch_story(args.ticket)

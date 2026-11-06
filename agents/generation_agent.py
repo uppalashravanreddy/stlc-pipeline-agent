@@ -9,8 +9,13 @@ CAPSTONE CONCEPTS DEMONSTRATED:
 """
 from config.agent_configs import AGENT_CONFIGS
 from memory.pipeline_state import PipelineState
+from memory.skill_loader import load_skill
 from agents.base_agent import BaseAgent
 from tools.phase_23_tools import PHASE_23_TOOLS, handle_phase_23_tool
+
+# CAPSTONE: Skills — each phase loads its own skill at runtime
+_SKILL_PHASE2 = load_skill("generate-test-cases")    # Phase 2 skill
+_SKILL_PHASE3 = load_skill("review-test-artifacts")  # Phase 3 skill
 
 
 PHASE_2_SYSTEM_PROMPT = """\
@@ -40,6 +45,8 @@ Security test type or High risk → at least one Security test case.
 ## HARD LIMIT
 Maximum 8 test cases. Quality over quantity — 8 precise cases beat 15 vague ones.
 Generate cases directly without a planning outline. Call save_test_cases when done.
+
+{skill}
 """
 
 PHASE_3_SYSTEM_PROMPT = """\
@@ -70,6 +77,8 @@ coverage_score: X/10
 approved = true only when coverage_score >= 7 AND no blocking issues on P1 cases.
 If you would not approve this for your team to execute, set approved=false and
 state exactly what must be fixed. Call save_review when your review is complete.
+
+{skill}
 """
 
 
@@ -103,7 +112,7 @@ class GenerationAgent(BaseAgent):
         )
 
         results = self.run_loop(
-            system_prompt=PHASE_2_SYSTEM_PROMPT,
+            system_prompt=PHASE_2_SYSTEM_PROMPT.format(skill=_SKILL_PHASE2),
             user_message=user_message,
             on_tool_call=handle_phase_23_tool,
         )
@@ -146,7 +155,7 @@ class GenerationAgent(BaseAgent):
         )
 
         results = self.run_loop(
-            system_prompt=PHASE_3_SYSTEM_PROMPT,
+            system_prompt=PHASE_3_SYSTEM_PROMPT.format(skill=_SKILL_PHASE3),
             user_message=user_message,
             on_tool_call=handle_phase_23_tool,
         )

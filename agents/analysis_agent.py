@@ -8,9 +8,14 @@ CAPSTONE CONCEPTS DEMONSTRATED:
 """
 from config.agent_configs import AGENT_CONFIGS
 from memory.pipeline_state import PipelineState
+from memory.skill_loader import load_skills
 from agents.base_agent import BaseAgent
 from tools.phase_01_tools import PHASE_01_TOOLS, handle_phase_01_tool
 
+# CAPSTONE: Skills — load classify-requirement + generate-test-plan at runtime.
+# These skill files define the QA methodology. Updating a skill file changes
+# agent behaviour without modifying any Python code.
+_SKILLS = load_skills("classify-requirement", "generate-test-plan")
 
 SYSTEM_PROMPT = """\
 You are a Senior QA Architect with 8+ years of experience across API, UI, Mobile, \
@@ -43,6 +48,8 @@ You own the scope of this feature's testing. Using your Phase 0 judgment to cali
 - High risk → broader scope, security scenarios, more edge cases
 - Low risk → tight focused scope, fewer scenarios
 - Call save_test_plan only when both phases are complete and you stand behind the output
+
+{skills}
 """
 
 
@@ -72,8 +79,11 @@ class AnalysisAgent(BaseAgent):
             "Call save_test_plan when both are complete."
         )
 
+        # Inject skills into system prompt at call time
+        prompt_with_skills = SYSTEM_PROMPT.format(skills=_SKILLS)
+
         results = self.run_loop(
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=prompt_with_skills,
             user_message=user_message,
             on_tool_call=handle_phase_01_tool,
         )
