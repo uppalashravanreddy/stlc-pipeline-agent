@@ -237,14 +237,18 @@ def _hitl_prompt(message: str) -> bool:
     print(f"  â”‚  y = approve  â”‚  n = abort  â”‚  s = skip to end         â”‚")
     print(f"  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜")
 
+    import sys
+    sys.stdout.flush()
     while True:
         answer = input("  > ").strip().lower()
+        if not answer:
+            continue
         if answer in ("y", "yes"):
             return True
         if answer in ("n", "no"):
             return False
         if answer in ("s", "skip"):
-            return True  # treat skip as approval for demo purposes
+            return True
         print("  Please enter y, n, or s.")
 
 

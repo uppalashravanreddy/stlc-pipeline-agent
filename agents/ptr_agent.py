@@ -1,11 +1,11 @@
-"""
-Phase 7 — Project Test Report (PTR) Agent + GitHub PR creation
+﻿"""
+Phase 7 â€” Project Test Report (PTR) Agent + GitHub PR creation
 
 Compiles a PTR from all STLC phases and creates a GitHub Pull Request.
-The PTR becomes the PR description — it's the handoff document for reviewers.
+The PTR becomes the PR description â€” it's the handoff document for reviewers.
 
 CAPSTONE: MCP Knowledge (write)
-  Phase 7 demonstrates MCP write — not just reading from Jira,
+  Phase 7 demonstrates MCP write â€” not just reading from Jira,
   but writing back to GitHub (creating a PR via API).
   .vscode/mcp.json registers the GitHub MCP server for VS Code.
   This agent calls GitHubClient directly for the Python pipeline.
@@ -20,11 +20,11 @@ SYSTEM_PROMPT = """\
 You are a Senior QA Lead compiling the final Project Test Report (PTR) for a completed STLC pipeline.
 
 The PTR will become a GitHub Pull Request description that reviewers, developers, and QA sign-off approvers will read.
-Write it clearly — your audience has not seen the pipeline run.
+Write it clearly â€” your audience has not seen the pipeline run.
 
 Your PTR must include:
-  - pr_title: short, specific (< 70 chars) — includes ticket ID
-  - executive_summary: 2-3 sentences — what was tested, key outcomes, recommendation
+  - pr_title: short, specific (< 70 chars) â€” includes ticket ID
+  - executive_summary: 2-3 sentences â€” what was tested, key outcomes, recommendation
   - phase_summary: one crisp line per phase (what it found/produced)
   - test_case_count and automation_count
   - coverage_score and quality_score from Phase 3 and Phase 5/6
@@ -37,7 +37,7 @@ RULE: Call save_ptr when the full report is complete.
 
 
 class PTRAgent(BaseAgent):
-    """Phase 7 — compiles PTR and creates GitHub PR."""
+    """Phase 7 â€” compiles PTR and creates GitHub PR."""
 
     def __init__(self):
         super().__init__(config=AGENT_CONFIGS["ptr"], tools=PHASE_7_TOOLS)
@@ -47,10 +47,10 @@ class PTRAgent(BaseAgent):
         Returns (updated_state, pr_url or None).
         pr_url is the GitHub PR link, or None if PR creation failed.
         """
-        print(f"\n{'─'*60}")
-        print(f"  PTR AGENT  (Phase 7 — Project Test Report + PR)")
+        print(f"\n{'â”€'*60}")
+        print(f"  PTR AGENT  (Phase 7 â€” Project Test Report + PR)")
         print(f"  Model: {self.config.model}")
-        print(f"{'─'*60}\n")
+        print(f"{'â”€'*60}\n")
 
         context = state.summary_for_next_agent()
         user_message = (
@@ -63,7 +63,7 @@ class PTRAgent(BaseAgent):
             system_prompt=SYSTEM_PROMPT,
             user_message=user_message,
             on_tool_call=handle_phase_7_tool,
-            phase_label="Phase 7 — PTR",
+            phase_label="Phase 7 â€” PTR",
         )
 
         pr_url = None
@@ -81,6 +81,62 @@ class PTRAgent(BaseAgent):
 
         return state, pr_url
 
+    def _commit_automation_to_branch(self, state: PipelineState, branch: str) -> None:
+        """
+        Write automation code to disk and commit it to the automation branch.
+        This ensures the PR has actual changes (GitHub rejects PRs with no commits).
+        """
+        import subprocess
+        from pathlib import Path
+
+        # Get the repo root
+        repo_root = Path(__file__).parent.parent
+
+        # Get automation code from Phase 6 (fixed) or Phase 4 (original)
+        auto = state.phase_6_fix or state.phase_4_automation or {}
+        fns  = auto.get("test_functions", [])
+        if not fns:
+            self._log("git_commit", "no automation code to commit")
+            return
+
+        # Build the pytest file content
+        test_file_name = auto.get("test_file_name", "test_stlc_automation.py")
+        lines = ["import pytest", ""]
+        for fn in fns:
+            if fn.get("docstring"):
+                lines.append(f"def {fn[\"function_name\"]}():")
+                lines.append(f"    \"\"\"{fn[\"docstring\"]}\"\"\"")
+            else:
+                lines.append(f"def {fn[\"function_name\"]}():")
+            lines.append(fn.get("code", "    pass"))
+            lines.append("")
+
+        # Write to tests/ folder
+        tests_dir = repo_root / "tests"
+        tests_dir.mkdir(exist_ok=True)
+        test_path = tests_dir / test_file_name
+        test_path.write_text("\\n".join(lines), encoding="utf-8")
+        self._log("git_commit", f"wrote {test_path.name}")
+
+        # Switch to the automation branch, commit, push, return to original branch
+        try:
+            current = subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=repo_root, text=True
+            ).strip()
+
+            subprocess.run(["git", "checkout", branch],       cwd=repo_root, check=True, capture_output=True)
+            subprocess.run(["git", "add", str(test_path)],    cwd=repo_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", f"feat: STLC automation — {state.feature_name[:60]}"],
+                cwd=repo_root, check=True, capture_output=True
+            )
+            subprocess.run(["git", "push", "origin", branch], cwd=repo_root, check=True, capture_output=True)
+            subprocess.run(["git", "checkout", current],      cwd=repo_root, check=True, capture_output=True)
+            self._log("git_commit", f"pushed {test_file_name} to {branch}")
+        except subprocess.CalledProcessError as e:
+            self._log("git_commit_warn", f"git operation failed: {e}")
+
     def _create_github_pr(self, state: PipelineState, ptr: dict) -> str | None:
         """Create GitHub PR using the PTR as the description."""
         try:
@@ -91,13 +147,13 @@ class PTRAgent(BaseAgent):
             try:
                 owner, repo = gh.get_repo_from_remote()
             except ValueError:
-                self._log("github", "Could not detect repo from .git/config — skipping PR creation")
+                self._log("github", "Could not detect repo from .git/config â€” skipping PR creation")
                 return None
 
             # Build PR body from PTR
             body = _build_pr_body(state, ptr)
 
-            # Fixed automation branch — all STLC pipeline runs target this branch
+            # Fixed automation branch â€” all STLC pipeline runs target this branch
             head_branch = "feat/stlc-automation"
 
             # Extract ticket ID from feature name for the default title
@@ -143,10 +199,10 @@ def _build_pr_body(state: PipelineState, ptr: dict) -> str:
         fns = state.phase_4_automation.get("test_functions", [])
 
     rec = ptr.get("recommendation", "")
-    rec_emoji = {"APPROVE": "✅", "APPROVE_WITH_CONDITIONS": "⚠️", "REQUEST_CHANGES": "❌"}.get(rec, "")
+    rec_emoji = {"APPROVE": "âœ…", "APPROVE_WITH_CONDITIONS": "âš ï¸", "REQUEST_CHANGES": "âŒ"}.get(rec, "")
 
     lines = [
-        f"## {rec_emoji} STLC Pipeline — {ptr.get('pr_title', '')}",
+        f"## {rec_emoji} STLC Pipeline â€” {ptr.get('pr_title', '')}",
         "",
         f"**{ptr.get('executive_summary', '')}**",
         "",
@@ -189,7 +245,7 @@ def _build_pr_body(state: PipelineState, ptr: dict) -> str:
     if risks:
         lines += ["## Open Risks", ""]
         for r in risks:
-            lines.append(f"- ⚠️ {r}")
+            lines.append(f"- âš ï¸ {r}")
         lines.append("")
 
     conditions = ptr.get("conditions", [])
@@ -202,9 +258,11 @@ def _build_pr_body(state: PipelineState, ptr: dict) -> str:
     lines += [
         "---",
         "",
-        f"*Generated by STLC Pipeline Agent — {state.feature_name}*",
+        f"*Generated by STLC Pipeline Agent â€” {state.feature_name}*",
         "",
-        "🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+        "ðŸ¤– Generated with [Claude Code](https://claude.com/claude-code)",
     ]
 
     return "\n".join(lines)
+
+
