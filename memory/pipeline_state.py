@@ -26,6 +26,9 @@ class PipelineState:
     phase_3_review: Optional[dict] = None
     phase_4_automation: Optional[dict] = None
     phase_5_automation_review: Optional[dict] = None
+    phase_6_fix: Optional[dict] = None          # Review Comments Fix
+    phase_7_ptr: Optional[dict] = None          # Project Test Report
+    github_pr_url: Optional[str] = None         # created PR URL
 
     # Tracking
     current_phase: int = 0
@@ -92,14 +95,17 @@ class PipelineState:
 
     def to_dict(self) -> dict:
         return {
-            "feature_name": self.feature_name,
-            "user_story": self.user_story,
-            "phase_0_classification": self.phase_0_classification,
-            "phase_1_test_plan": self.phase_1_test_plan,
-            "phase_2_test_cases": self.phase_2_test_cases,
-            "phase_3_review": self.phase_3_review,
-            "phase_4_automation": self.phase_4_automation,
+            "feature_name":            self.feature_name,
+            "user_story":              self.user_story,
+            "phase_0_classification":  self.phase_0_classification,
+            "phase_1_test_plan":       self.phase_1_test_plan,
+            "phase_2_test_cases":      self.phase_2_test_cases,
+            "phase_3_review":          self.phase_3_review,
+            "phase_4_automation":      self.phase_4_automation,
             "phase_5_automation_review": self.phase_5_automation_review,
-            "current_phase": self.current_phase,
-            "hitl_approvals": self.hitl_approvals,
+            "phase_6_fix":             self.phase_6_fix,
+            "phase_7_ptr":             self.phase_7_ptr,
+            "github_pr_url":           self.github_pr_url,
+            "current_phase":           self.current_phase,
+            "hitl_approvals":          self.hitl_approvals,
         }

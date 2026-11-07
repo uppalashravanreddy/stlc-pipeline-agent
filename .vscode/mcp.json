@@ -8,6 +8,15 @@
         "-File", "${workspaceFolder}/scripts/start-jira-mcp.ps1"
       ],
       "cwd": "${workspaceFolder}"
+    },
+    "github": {
+      "type": "stdio",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/start-github-mcp.ps1"
+      ],
+      "cwd": "${workspaceFolder}"
     }
   }
 }

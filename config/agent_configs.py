@@ -23,6 +23,20 @@ class AgentConfig:
 # claude-opus   → reserved for complex enterprise reasoning (Expert eval only)
 
 AGENT_CONFIGS: dict[str, AgentConfig] = {
+    "fix": AgentConfig(
+        name="fix",
+        model="claude-sonnet-4-6",           # Phase 6 — code generation quality needed
+        max_tokens=4000,
+        max_iterations=5,
+        description="Phase 6: Fix review comments in automation code.",
+    ),
+    "ptr": AgentConfig(
+        name="ptr",
+        model="claude-haiku-4-5-20251001",   # Phase 7 — formatting/assembly, not heavy reasoning
+        max_tokens=3000,
+        max_iterations=4,
+        description="Phase 7: Compile PTR and create GitHub PR.",
+    ),
     "orchestrator": AgentConfig(
         name="orchestrator",
         model="claude-haiku-4-5-20251001",   # coordinates only — no generation needed

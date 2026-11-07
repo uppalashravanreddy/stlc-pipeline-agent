@@ -18,6 +18,8 @@ from memory.summary_writer import save_pipeline_summary, save_debug_json, save_c
 from agents.analysis_agent import AnalysisAgent
 from agents.generation_agent import GenerationAgent
 from agents.automation_agent import AutomationAgent
+from agents.fix_agent import FixAgent
+from agents.ptr_agent import PTRAgent
 
 LOGS_DIR = Path(__file__).parent.parent / "logs"
 
@@ -39,6 +41,8 @@ class Orchestrator:
         self.analysis_agent   = AnalysisAgent()
         self.generation_agent = GenerationAgent()
         self.automation_agent = AutomationAgent()
+        self.fix_agent        = FixAgent()
+        self.ptr_agent        = PTRAgent()
 
     def run(self, feature_name: str, user_story: str,
             resume_state: PipelineState | None = None,
@@ -159,14 +163,35 @@ class Orchestrator:
             save_checkpoint_cache(state)
 
         # ── HITL Gate 3 ──────────────────────────────────────────────────────
-        _banner("HITL GATE 3 — Final Sign-off")
+        _banner("HITL GATE 3 — Review Automation")
         _print_phase_45_summary(state)
 
-        if not _hitl_prompt("Approve automation and complete pipeline?"):
+        if not _hitl_prompt("Approve automation and proceed to fix review comments?"):
             state.hitl_approvals["gate_3"] = "rejected"
             save_debug_json(state, "Pipeline aborted by user at Gate 3")
             return state
         state.hitl_approvals["gate_3"] = "approved"
+
+        # ── Phase 6 (Fix Review Comments) ────────────────────────────────────
+        state = self.fix_agent.run(state)
+        self.fix_agent.log_path = log_path
+        save_checkpoint_cache(state)
+
+        # ── HITL Gate 4 ──────────────────────────────────────────────────────
+        _banner("HITL GATE 4 — Review Fixes + Approve PR Creation")
+        _print_phase_6_summary(state)
+
+        if not _hitl_prompt("Approve fixes and create GitHub Pull Request?"):
+            state.hitl_approvals["gate_4"] = "rejected"
+            save_debug_json(state, "Pipeline aborted by user at Gate 4")
+            return state
+        state.hitl_approvals["gate_4"] = "approved"
+
+        # ── Phase 7 (PTR + Create GitHub PR) ─────────────────────────────────
+        self.ptr_agent.log_path = log_path
+        state, pr_url = self.ptr_agent.run(state)
+        state.github_pr_url = pr_url
+        save_checkpoint_cache(state)
 
         # ── SUCCESS — write ONE summary file ─────────────────────────────────
         _banner("PIPELINE COMPLETE")
@@ -272,6 +297,17 @@ def _print_phase_23_summary(state: PipelineState) -> None:
         print(f"  Gaps: {', '.join(r['gaps'])}")
 
 
+def _print_phase_6_summary(state: PipelineState) -> None:
+    fix = state.phase_6_fix or {}
+    manifest = fix.get("fix_manifest", [])
+    fns = fix.get("test_functions", [])
+    print(f"  Phase 6 — {len(manifest)} fixes applied | {len(fns)} functions updated")
+    for f in manifest[:4]:
+        print(f"    [{f.get('severity','?')}] {f.get('function_name','')} — {f.get('fix_applied','')[:60]}")
+    if len(manifest) > 4:
+        print(f"    ... and {len(manifest)-4} more")
+
+
 def _print_phase_45_summary(state: PipelineState) -> None:
     auto = state.phase_4_automation or {}
     rev = state.phase_5_automation_review or {}
@@ -288,9 +324,11 @@ def _print_phase_45_summary(state: PipelineState) -> None:
 
 
 def _print_final_summary(state: PipelineState) -> None:
-    print(f"  Feature  : {state.feature_name}")
-    print(f"  Phases   : 0 ✓  1 ✓  2 ✓  3 ✓  4 ✓  5 ✓")
-    print(f"  Test Cases: {len(state.phase_2_test_cases or [])}")
-    print(f"  Automation: {len((state.phase_4_automation or {}).get('test_functions', []))} functions")
-    print(f"  Gates     : {state.hitl_approvals}")
-    print(f"\n  All output saved to ./output/\n")
+    print(f"  Feature    : {state.feature_name}")
+    print(f"  Phases     : 0 ✓  1 ✓  2 ✓  3 ✓  4 ✓  5 ✓  6 ✓  7 ✓")
+    print(f"  Test Cases : {len(state.phase_2_test_cases or [])}")
+    print(f"  Automation : {len((state.phase_4_automation or {}).get('test_functions', []))} functions")
+    print(f"  Gates      : {state.hitl_approvals}")
+    if state.github_pr_url:
+        print(f"\n  GitHub PR  : {state.github_pr_url}")
+    print(f"\n  Summary    : output/<story-id>/stlc_summary_*.md\n")
