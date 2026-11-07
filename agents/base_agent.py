@@ -80,29 +80,49 @@ class BaseAgent:
         """
         messages = [{"role": "user", "content": user_message}]
         results: list = []
-        budget = self.config.max_tokens   # total output tokens this agent can use
+        budget = self.config.max_tokens
+
+        # CAPSTONE: Prompt Caching
+        # The system prompt is static — same text on every iteration and every run.
+        # Marking it with cache_control stores it after the first call.
+        # Subsequent calls within 5 min use the cached version at ~90% cheaper input tokens.
+        # Change: system= string  →  system= list with cache_control block
+        cached_system = [
+            {
+                "type": "text",
+                "text": system_prompt,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
 
         for iteration in range(1, self.config.max_iterations + 1):
             response = self.client.messages.create(
                 model=self.config.model,
                 max_tokens=budget,
-                system=system_prompt,
+                system=cached_system,          # ← was: system=system_prompt
                 tools=self.tools,
                 messages=messages,
+                betas=["prompt-caching-2024-07-31"],   # required to enable caching
             )
 
-            out_tokens = response.usage.output_tokens
-            in_tokens  = response.usage.input_tokens
-            pct_used   = round(out_tokens / budget * 100, 1)
+            out_tokens    = response.usage.output_tokens
+            in_tokens     = response.usage.input_tokens
+            cache_created = getattr(response.usage, "cache_creation_input_tokens", 0)
+            cache_read    = getattr(response.usage, "cache_read_input_tokens", 0)
+            pct_used      = round(out_tokens / budget * 100, 1)
 
-            # Structured log line:
-            # [AGENT       ] Phase X — label | iter N/M | model | budget=N | in=N | out=N/budget (N%) | stop=reason
+            # Show cache activity in the log
+            cache_note = ""
+            if cache_created: cache_note = f" | cache_written={cache_created:,}"
+            if cache_read:    cache_note = f" | cache_hit={cache_read:,} (saved)"
+
+            # Log line: agent | phase | iter | model | budget | in | out% | cache | stop
             self._log(
                 f"{phase_label} | iter {iteration}/{self.config.max_iterations}",
                 f"model={self.config.model} | "
                 f"budget={budget:,} | "
                 f"in={in_tokens:,} | "
-                f"out={out_tokens:,}/{budget:,} ({pct_used}%) | "
+                f"out={out_tokens:,}/{budget:,} ({pct_used}%){cache_note} | "
                 f"stop={response.stop_reason}",
                 iteration=iteration,
                 phase=phase_label,
@@ -110,6 +130,8 @@ class BaseAgent:
                 tokens_out=out_tokens,
                 token_budget=budget,
                 pct_budget_used=pct_used,
+                cache_created=cache_created,
+                cache_read=cache_read,
                 stop_reason=response.stop_reason,
             )
 
