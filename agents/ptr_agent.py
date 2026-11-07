@@ -100,10 +100,15 @@ class PTRAgent(BaseAgent):
             # Fixed automation branch — all STLC pipeline runs target this branch
             head_branch = "feat/stlc-automation"
 
+            # Extract ticket ID from feature name for the default title
+            import re as _re
+            _match = _re.match(r"^([A-Z]+-\d+)", state.feature_name.strip())
+            ticket_id = _match.group(1) if _match else "STLC"
+
             result = gh.create_pull_request(
                 owner=owner,
                 repo=repo,
-                title=ptr.get("pr_title", f"[{ticket.upper()}] STLC Automation"),
+                title=ptr.get("pr_title", f"[{ticket_id}] STLC Automation"),
                 body=body,
                 head=head_branch,
                 base="main",

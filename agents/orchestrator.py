@@ -329,6 +329,12 @@ def _print_final_summary(state: PipelineState) -> None:
     print(f"  Test Cases : {len(state.phase_2_test_cases or [])}")
     print(f"  Automation : {len((state.phase_4_automation or {}).get('test_functions', []))} functions")
     print(f"  Gates      : {state.hitl_approvals}")
+    print(f"\n  Summary    : output/<story-id>/stlc_summary_*.md")
     if state.github_pr_url:
-        print(f"\n  GitHub PR  : {state.github_pr_url}")
-    print(f"\n  Summary    : output/<story-id>/stlc_summary_*.md\n")
+        print(f"\n{'─'*60}")
+        print(f"  GitHub PR Created ✅")
+        print(f"  {state.github_pr_url}")
+        print(f"{'─'*60}")
+        print(f"\n  Next: python peer_review_agent.py --mr-url {state.github_pr_url}\n")
+    else:
+        print(f"\n  GitHub PR  : not created (check logs for reason)\n")
