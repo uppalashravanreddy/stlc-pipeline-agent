@@ -97,11 +97,8 @@ class PTRAgent(BaseAgent):
             # Build PR body from PTR
             body = _build_pr_body(state, ptr)
 
-            # Branch name from ticket ID
-            import re
-            match = re.match(r"^([A-Z]+-\d+)", state.feature_name.strip())
-            ticket = match.group(1).lower() if match else "stlc"
-            head_branch = f"feat/{ticket}-stlc-automation"
+            # Fixed automation branch — all STLC pipeline runs target this branch
+            head_branch = "feat/stlc-automation"
 
             result = gh.create_pull_request(
                 owner=owner,
