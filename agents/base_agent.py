@@ -99,7 +99,7 @@ class BaseAgent:
             response = self.client.messages.create(
                 model=self.config.model,
                 max_tokens=budget,
-                system=cached_system,          # â† was: system=system_prompt
+                system=cached_system,
                 tools=self.tools,
                 messages=messages,
                 extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
@@ -206,4 +206,5 @@ class BaseAgent:
             )
 
         return results   # list of all captured outputs (may be empty)
+
 
