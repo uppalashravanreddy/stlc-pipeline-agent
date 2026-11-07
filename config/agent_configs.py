@@ -26,8 +26,8 @@ AGENT_CONFIGS: dict[str, AgentConfig] = {
     "fix": AgentConfig(
         name="fix",
         model="claude-sonnet-4-6",           # Phase 6 — code generation quality needed
-        max_tokens=4000,
-        max_iterations=5,
+        max_tokens=8000,                     # increased: 4000 was too small for 7 test functions
+        max_iterations=6,
         description="Phase 6: Fix review comments in automation code.",
     ),
     "ptr": AgentConfig(

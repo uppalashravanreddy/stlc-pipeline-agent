@@ -105,13 +105,20 @@ class PTRAgent(BaseAgent):
             _match = _re.match(r"^([A-Z]+-\d+)", state.feature_name.strip())
             ticket_id = _match.group(1) if _match else "STLC"
 
+            # Detect default branch from GitHub (main vs master)
+            try:
+                repo_info = gh._get(f"/repos/{owner}/{repo}")
+                default_branch = repo_info.get("default_branch", "main")
+            except Exception:
+                default_branch = "main"
+
             result = gh.create_pull_request(
                 owner=owner,
                 repo=repo,
                 title=ptr.get("pr_title", f"[{ticket_id}] STLC Automation"),
                 body=body,
                 head=head_branch,
-                base="main",
+                base=default_branch,          # uses actual repo default (main or master)
                 draft=True,
             )
             pr_url = result.get("html_url", "")
