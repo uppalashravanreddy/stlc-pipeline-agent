@@ -1,4 +1,4 @@
-﻿"""
+"""
 Phase 7 â€” Project Test Report (PTR) Agent + GitHub PR creation
 
 Compiles a PTR from all STLC phases and creates a GitHub Pull Request.
@@ -104,10 +104,10 @@ class PTRAgent(BaseAgent):
         lines = ["import pytest", ""]
         for fn in fns:
             if fn.get("docstring"):
-                lines.append(f"def {fn[\"function_name\"]}():")
-                lines.append(f"    \"\"\"{fn[\"docstring\"]}\"\"\"")
+                lines.append(f"def {fn.get('function_name', 'test_unnamed')}():")
+                lines.append(f"    \"\"\"{fn.get('docstring', '')}\"\"\"")
             else:
-                lines.append(f"def {fn[\"function_name\"]}():")
+                lines.append(f"def {fn.get('function_name', 'test_unnamed')}():")
             lines.append(fn.get("code", "    pass"))
             lines.append("")
 
@@ -115,7 +115,7 @@ class PTRAgent(BaseAgent):
         tests_dir = repo_root / "tests"
         tests_dir.mkdir(exist_ok=True)
         test_path = tests_dir / test_file_name
-        test_path.write_text("\\n".join(lines), encoding="utf-8")
+        test_path.write_text("\n".join(lines), encoding="utf-8")
         self._log("git_commit", f"wrote {test_path.name}")
 
         # Switch to the automation branch, commit, push, return to original branch
@@ -264,5 +264,6 @@ def _build_pr_body(state: PipelineState, ptr: dict) -> str:
     ]
 
     return "\n".join(lines)
+
 
 

@@ -1,4 +1,4 @@
-﻿"""
+"""
 CAPSTONE CONCEPTS DEMONSTRATED:
   - Agent vs Sub-Agents: Orchestrator is the COORDINATOR. It decides sequencing,
       handles HITL gates, and delegates all QA work to sub-agents. It never
