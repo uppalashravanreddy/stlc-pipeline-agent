@@ -56,6 +56,7 @@ class JiraClient:
         self._api_version = "3" if "atlassian.net" in self.base_url else "2"
 
     def fetch_story(self, ticket_key: str) -> dict:
+        ticket_key = ticket_key.strip().upper()   # normalise: kan-20 → KAN-20
         """
         Fetch a Jira ticket and return:
           {
