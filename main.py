@@ -1,17 +1,24 @@
 """
-Entry point — runs the STLC pipeline on a sample user story.
-Usage: python main.py
-       python main.py --feature "Checkout" --story "As a user..."
+Entry point for the STLC Pipeline Agent — Advanced Capstone (Phases 0–5).
+
+Usage:
+  python main.py                              # default User Authentication story
+  python main.py --ticket KAN-14             # fetch story from Jira via MCP
+  python main.py --feature "X" --story "Y"  # pass story text directly
+
+CAPSTONE: MCP Knowledge
+  --ticket mode connects to Jira via the MCP integration in .vscode/mcp.json.
+  The JiraClient fetches the live story so you never need to copy-paste text.
+  This is what MCP enables: agents consuming live external data by ID, not text.
 """
 import argparse
 import os
 import sys
 from dotenv import load_dotenv
-from agent import run_pipeline
+from agents.orchestrator import Orchestrator
 
 load_dotenv()
 
-# Default sample — User Authentication (security risk, API + UI, rich AC)
 DEFAULT_FEATURE = "User Authentication — Login"
 DEFAULT_STORY = """\
 As a registered user, I want to securely log in to the application
@@ -26,33 +33,68 @@ Acceptance Criteria:
 - A "Remember me" option extends session persistence to 7 days on trusted devices"""
 
 
-def main():
-    parser = argparse.ArgumentParser(description="STLC Pipeline Agent — Phase 0 + Phase 1")
-    parser.add_argument("--feature", default=DEFAULT_FEATURE, help="Feature name")
-    parser.add_argument("--story", default=DEFAULT_STORY, help="User story text")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="STLC Pipeline Agent — Advanced Capstone")
+    parser.add_argument("--ticket",  default=None,           help="Jira ticket ID (e.g. KAN-14) — fetches story via MCP")
+    parser.add_argument("--feature", default=DEFAULT_FEATURE, help="Feature name (used when --ticket not provided)")
+    parser.add_argument("--story",   default=DEFAULT_STORY,   help="User story text (used when --ticket not provided)")
     args = parser.parse_args()
 
     if not os.getenv("ANTHROPIC_API_KEY"):
-        print("[Error] ANTHROPIC_API_KEY not set. Add it to .env or your environment.")
+        print("[Error] ANTHROPIC_API_KEY not set. Add it to .env")
         sys.exit(1)
 
-    result = run_pipeline(feature_name=args.feature, user_story=args.story)
+    # ── CAPSTONE: MCP + Skill — fetch story from Jira by ticket ID ──────────
+    if args.ticket:
+        try:
+            from tools.jira_client import JiraClient
+            from memory.skill_loader import load_skill
+            # fetch-user-story skill defines HOW to validate and format a Jira story
+            # It runs here (entry point) before the pipeline starts
+            _fetch_skill = load_skill("fetch-user-story")
+            if _fetch_skill:
+                print(f"  [skills] fetch-user-story loaded")
 
-    if result:
-        c = result["phase_0_classification"]
-        print("=" * 60)
-        print("  PIPELINE SUMMARY")
-        print("=" * 60)
-        print(f"  Feature  : {result['feature_name']}")
-        print(f"  Type     : {c['test_type']}")
-        print(f"  Risk     : {c['risk_level']}")
-        print(f"  Approach : {c['test_approach']}")
-        print(f"  Priority : {c['priority']}")
-        print(f"\n  Output saved to ./output/")
-        print("=" * 60)
+            print(f"\n[MCP] Fetching {args.ticket} from Jira...")
+            jira    = JiraClient()
+            story   = jira.fetch_story(args.ticket)
+            feature = story["feature_name"]
+            text    = story["user_story"]
+            print(f"[MCP] Story loaded: {feature}\n")
+        except (EnvironmentError, ValueError) as e:
+            print(f"[Error] Jira fetch failed: {e}")
+            print("Add JIRA_INSTANCE_URL, JIRA_USER_EMAIL, JIRA_API_TOKEN to .env")
+            sys.exit(1)
     else:
-        print("[Error] Pipeline produced no output. Check agent reasoning above.")
+        feature = args.feature
+        text    = args.story
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # CAPSTONE: External Memory — check for existing work before re-running
+    from memory.checkpoint import find_existing_checkpoint, load_checkpoint, describe_checkpoint
+    checkpoint = find_existing_checkpoint(feature)
+
+    resume_from = 0
+    state = None
+
+    if checkpoint:
+        print(f"\n{describe_checkpoint(checkpoint)}")
+        print("\n  Resume from last checkpoint? (y = yes / n = start fresh)")
+        answer = input("  > ").strip().lower()
+        if answer in ("y", "yes"):
+            state, resume_from = load_checkpoint(feature, text)
+            print(f"\n  Resuming from Phase {resume_from}...\n")
+
+    orchestrator = Orchestrator()
+    state = orchestrator.run(feature_name=feature, user_story=text,
+                              resume_state=state, resume_from=resume_from)
+
+    if state is None:
+        print("\n[Error] Pipeline failed at Phase 0+1.")
         sys.exit(1)
+
+    completed = state.current_phase
+    print(f"\nDone. Completed through Phase {completed}. Check ./output/ for all artifacts.")
 
 
 if __name__ == "__main__":
