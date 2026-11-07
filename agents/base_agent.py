@@ -99,10 +99,10 @@ class BaseAgent:
             response = self.client.messages.create(
                 model=self.config.model,
                 max_tokens=budget,
-                system=cached_system,          # ← was: system=system_prompt
+                system=cached_system,
                 tools=self.tools,
                 messages=messages,
-                betas=["prompt-caching-2024-07-31"],   # required to enable caching
+                extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
             )
 
             out_tokens    = response.usage.output_tokens
