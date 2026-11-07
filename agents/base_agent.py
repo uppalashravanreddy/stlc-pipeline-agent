@@ -1,8 +1,8 @@
-"""
+﻿"""
 CAPSTONE CONCEPTS DEMONSTRATED:
   - Hard Stops: max_iterations cap enforced in run_loop()
   - Observability: _log() writes to console AND a structured JSONL log file.
-      Every agent event — iterations, token counts, tool calls, hard stops —
+      Every agent event â€” iterations, token counts, tool calls, hard stops â€”
       is recorded with a timestamp. Open logs/ after a run to see the full trace.
   - Agent Configurations: config dataclass carries model + limits per agent
 """
@@ -29,7 +29,7 @@ class BaseAgent:
         self.client  = anthropic.Anthropic()
         self.log_path: Optional[Path] = None   # set by orchestrator
 
-    # ── Observability ─────────────────────────────────────────────────────────
+    # â”€â”€ Observability â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def _log(self, event: str, detail: str = "", **extra) -> None:
         """
@@ -37,7 +37,7 @@ class BaseAgent:
 
         Writes every agent event to:
           1. Console (immediate visibility during the run)
-          2. JSONL log file (persistent audit trail — open after the run)
+          2. JSONL log file (persistent audit trail â€” open after the run)
 
         Each log entry captures:
           timestamp, agent name, event type, detail, and any extra fields
@@ -60,14 +60,14 @@ class BaseAgent:
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry) + "\n")
 
-    # ── Agentic loop ──────────────────────────────────────────────────────────
+    # â”€â”€ Agentic loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def run_loop(
         self,
         system_prompt: str,
         user_message: str,
         on_tool_call: Callable[[str, dict], tuple[dict, Optional[Any]]],
-        phase_label: str = "",          # e.g. "Phase 0+1 — Classify + Test Plan"
+        phase_label: str = "",          # e.g. "Phase 0+1 â€” Classify + Test Plan"
     ) -> Optional[Any]:
         """
         CAPSTONE: Hard Stops + Observability
@@ -83,10 +83,10 @@ class BaseAgent:
         budget = self.config.max_tokens
 
         # CAPSTONE: Prompt Caching
-        # The system prompt is static — same text on every iteration and every run.
+        # The system prompt is static â€” same text on every iteration and every run.
         # Marking it with cache_control stores it after the first call.
         # Subsequent calls within 5 min use the cached version at ~90% cheaper input tokens.
-        # Change: system= string  →  system= list with cache_control block
+        # Change: system= string  â†’  system= list with cache_control block
         cached_system = [
             {
                 "type": "text",
@@ -99,10 +99,10 @@ class BaseAgent:
             response = self.client.messages.create(
                 model=self.config.model,
                 max_tokens=budget,
-                system=cached_system,          # ← was: system=system_prompt
+                system=cached_system,          # â† was: system=system_prompt
                 tools=self.tools,
                 messages=messages,
-                betas=["prompt-caching-2024-07-31"],   # required to enable caching
+                extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
             )
 
             out_tokens    = response.usage.output_tokens
@@ -175,7 +175,7 @@ class BaseAgent:
                         "content": (
                             "You were cut off at the token limit. "
                             "Call the save tool NOW with whatever you have generated so far. "
-                            "Do not re-plan or regenerate — just call the tool immediately."
+                            "Do not re-plan or regenerate â€” just call the tool immediately."
                         ),
                     })
                 continue
@@ -206,3 +206,4 @@ class BaseAgent:
             )
 
         return results   # list of all captured outputs (may be empty)
+
