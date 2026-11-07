@@ -1,6 +1,14 @@
-"""
-ONE tool: save_test_plan
-Forces the agent to structure both Phase 0 and Phase 1 output before persisting.
+﻿"""
+Phase 0+1 Tool — Reference Implementation (archived)
+
+Original single tool from the Intermediate capstone.
+Forces the agent to complete both Phase 0 and Phase 1 before saving.
+
+The Expert capstone uses separate tool files per phase:
+  tools/phase_01_tools.py  — save_test_plan (capture-only)
+  tools/phase_23_tools.py  — save_test_cases + save_review
+  tools/phase_45_tools.py  — save_automation + save_automation_review
+  tools/phase_67_tools.py  — save_fixed_automation + save_ptr
 """
 import json
 from datetime import datetime
@@ -110,7 +118,7 @@ def handle_tool_call(name: str, tool_input: dict) -> dict:
 def _save_test_plan(data: dict) -> dict:
     OUTPUT_DIR.mkdir(exist_ok=True)
 
-    slug = data["feature_name"].lower().replace(" ", "_").replace("—", "").replace("-", "_")
+    slug = data["feature_name"].lower().replace(" ", "_").replace("â€”", "").replace("-", "_")
     slug = "".join(c for c in slug if c.isalnum() or c == "_")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     md_path = OUTPUT_DIR / f"{slug}_{timestamp}.md"
@@ -125,7 +133,7 @@ def _save_test_plan(data: dict) -> dict:
         "",
         "---",
         "",
-        "## Phase 0 — Classification",
+        "## Phase 0 â€” Classification",
         "",
         "| Field | Value |",
         "|-------|-------|",
@@ -138,7 +146,7 @@ def _save_test_plan(data: dict) -> dict:
         "",
         "---",
         "",
-        "## Phase 1 — Test Plan",
+        "## Phase 1 â€” Test Plan",
         "",
         "### Objectives",
     ]
@@ -168,11 +176,12 @@ def _save_test_plan(data: dict) -> dict:
     md_path.write_text("\n".join(lines), encoding="utf-8")
     json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    print(f"[Tool] Saved → {md_path.name}")
-    print(f"[Tool] Saved → {json_path.name}")
+    print(f"[Tool] Saved â†’ {md_path.name}")
+    print(f"[Tool] Saved â†’ {json_path.name}")
 
     return {
         "status": "success",
         "markdown_file": str(md_path),
         "json_file": str(json_path),
     }
+

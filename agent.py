@@ -1,6 +1,6 @@
-"""
-STLC Pipeline Agent — Intermediate Capstone
-Single agent | Phase 0: Classification → Phase 1: Test Plan | ONE tool: save_test_plan
+﻿"""
+STLC Pipeline Agent â€” Intermediate Capstone
+Single agent | Phase 0: Classification â†’ Phase 1: Test Plan | ONE tool: save_test_plan
 """
 import json
 import os
@@ -11,27 +11,27 @@ MODEL = "claude-sonnet-4-6"
 
 SYSTEM_PROMPT = """You are a senior QA architect running a 2-phase STLC pipeline.
 
-## PHASE 0 — CLASSIFICATION
+## PHASE 0 â€” CLASSIFICATION
 Analyze the feature/user story and determine:
 - test_type: primary type (API | UI | Mobile | Integration | Performance | Security | E2E)
-- risk_level: High | Medium | Low — based on business impact × technical complexity
-- test_approach: Automated | Manual | Both — based on ROI and feasibility
-- priority: P1 | P2 | P3 — P1 means release is blocked without this testing
+- risk_level: High | Medium | Low â€” based on business impact Ã— technical complexity
+- test_approach: Automated | Manual | Both â€” based on ROI and feasibility
+- priority: P1 | P2 | P3 â€” P1 means release is blocked without this testing
 - rationale: 1-2 sentences explaining your classification decisions
 
-## PHASE 1 — TEST PLAN
+## PHASE 1 â€” TEST PLAN
 Using Phase 0 output to inform depth and focus, generate:
 - objectives: 2-3 specific, measurable testing goals
 - in_scope: behaviors and areas that WILL be tested
 - out_of_scope: explicitly excluded areas (no ambiguity)
-- test_scenarios: 5-7 concrete scenarios — mix of positive, negative, and edge cases
+- test_scenarios: 5-7 concrete scenarios â€” mix of positive, negative, and edge cases
 - entry_criteria: pre-conditions that must be true before testing begins
 - exit_criteria: measurable conditions that define testing as done
 
 ## RULES
-1. Reason through Phase 0 first — state your classification with justification
+1. Reason through Phase 0 first â€” state your classification with justification
 2. Let Phase 0 risk level and test type drive scope in Phase 1
-3. High risk → broader scope, more edge cases; Low risk → focused scope
+3. High risk â†’ broader scope, more edge cases; Low risk â†’ focused scope
 4. Only call save_test_plan after both phases are fully completed"""
 
 
@@ -108,3 +108,4 @@ def run_pipeline(feature_name: str, user_story: str) -> dict | None:
             })
 
     return result
+
