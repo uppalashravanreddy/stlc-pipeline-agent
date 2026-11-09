@@ -1,3 +1,7 @@
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 """
 Entry point for the STLC Pipeline Agent — Advanced Capstone (Phases 0–5).
 

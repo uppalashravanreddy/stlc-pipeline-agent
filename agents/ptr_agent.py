@@ -168,6 +168,19 @@ class PTRAgent(BaseAgent):
             except Exception:
                 default_branch = "main"
 
+
+            # Check if a PR already exists for this branch
+            try:
+                existing_prs = gh._get(
+                    f"/repos/{owner}/{repo}/pulls?head={owner}:{head_branch}&state=open"
+                )
+                if existing_prs:
+                    pr_url = existing_prs[0].get("html_url", "")
+                    self._log("PR exists", f"using existing PR: {pr_url}")
+                    return pr_url
+            except Exception:
+                pass  # if check fails, attempt creation anyway
+
             result = gh.create_pull_request(
                 owner=owner,
                 repo=repo,
